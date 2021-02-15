@@ -1,0 +1,4 @@
+"state_distribution_control","state_distribution_intervention","state_costs_control","state_costs_intervention","state_QALYs"
+900,950,100,500,1
+90,45,1000,1000,0.5
+10,5,0,0,0
