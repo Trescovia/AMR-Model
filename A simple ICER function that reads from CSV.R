@@ -22,3 +22,7 @@ ICER_csv <- function(inputdata){
 ICER_csv("inputdata.csv")
 ICER_csv("pessimistic inputs.csv")
 ICER_csv("optimistic inputs.csv")
+
+##New branch
+#Lorem ipsum dolor sit amet
+
