@@ -68,3 +68,42 @@ plot(CEAC,
      xlab = 'Willingness to Pay to Avert an Additional DALY',
      ylab = "Portion of Interventions Cost-Effective",
      main = 'Cost Effectiveness Acceptability Curve')
+
+
+################################################################################
+#Also randomise the CET/WTP
+
+set.seed(420)
+
+ICER_Vector <- c(rep(0,10000))
+
+for(i in 1:10000){
+  CET <- rnorm(1,10000,2500)
+  if(CET <= ICER_rand("inputdata.csv")){
+  ICER_Vector[i] <- 1} 
+  rm(i)
+}
+
+sum(ICER_Vector)
+
+################################################################################
+#turn this into a function as well
+Chance_effective <- function(inputdata){
+  
+  set.seed(420)
+  
+  ICER_Vector <- c(rep(0,10000))
+  
+  for(i in 1:10000){
+    CET <- rnorm(1,10000,2500)
+    if(CET <= ICER_rand("inputdata.csv")){
+      ICER_Vector[i] <- 1} 
+    rm(i)
+  }
+  
+  Answer <- paste(100*mean(ICER_Vector), "% of Interventions are Cost-Effective")
+    
+  return(Answer)
+}
+
+Chance_effective("inputdata.csv")
