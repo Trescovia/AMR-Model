@@ -2,7 +2,7 @@ setwd("C:/Users/tresc/Dropbox/LSHTM")
 
 ICER_csv <- function(inputdata){
   setwd("C:/Users/tresc/Dropbox/LSHTM")
-  inputdata <- read.csv("inputdata.csv")
+  inputdata <- read.csv(inputdata)
   inputdata <- as.data.frame(inputdata)
   costs_intervention <- inputdata$state_distribution_intervention * inputdata$state_costs_intervention
   total_cost_intervention <- costs_intervention[1]+costs_intervention[2]+costs_intervention[3]
@@ -28,7 +28,7 @@ ICER_csv("optimistic inputs.csv")
 
 ICER_rand <- function(inputdata){
   setwd("C:/Users/tresc/Dropbox/LSHTM")
-  inputdata <- read.csv("inputdata.csv")
+  inputdata <- read.csv(inputdata)
   inputdata <- as.data.frame(inputdata)
   
   #replace intervention cost with a random draw
@@ -48,6 +48,8 @@ ICER_rand <- function(inputdata){
   
   return(ICER)
 }
+
+ICER_rand("inputdata.csv")
 
 ICER_Vector <- c(rep(0,10000))
 
