@@ -92,8 +92,6 @@ sum(ICER_Vector)
 #turn this into a function as well
 Chance_effective <- function(inputdata){
   
-  set.seed(420)
-  
   ICER_Vector <- c(rep(0,10000))
   
   for(i in 1:10000){
@@ -109,3 +107,6 @@ Chance_effective <- function(inputdata){
 }
 
 Chance_effective("inputdata.csv")
+
+
+
