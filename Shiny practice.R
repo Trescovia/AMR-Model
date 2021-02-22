@@ -38,12 +38,15 @@ ui <- dashboardPage(
               box(
                 title = "Cost-Effectiveness Acceptability Curve",
                 background = "teal",
-                width = 8,
+                width = 12,
                 plotOutput("CEAC")
               ),
               box(
-                numericInput("CEAC_int_cost", em("Healthcare Cost with Intervention:", 500, min = 0, max = 10000), width = 4)
-              )
+                numericInput("CEAC_int_cost", em("Expected Healthcare Cost with Intervention:"), 500, min = 0, max = 10000), width = 6)
+              ),
+              box(
+                numericInput("CEAC_bau_cost", em("Expected Healthcare Cost without Intervention:"), 100, min = 0, max = 10000), width = 4
+              ) 
       ),
       tabItem("determ",
               box(
@@ -53,10 +56,10 @@ ui <- dashboardPage(
                 textOutput("ICER_determ")
               ),
               box(
-                numericInput("determ_int_cost", em("Healthcare Cost with Intervention:", 500, min = 0, max = 10000), width = 4)
+                numericInput("determ_int_cost", em("Healthcare Cost with Intervention:"), 500, min = 0, max = 10000), width = 4)
               ),
               box(
-                numericInput("determ_bau_cost", em("Healthcare Cost without Intervention:", 500, min = 0, max = 10000), width = 4)
+                numericInput("determ_bau_cost", em("Healthcare Cost without Intervention:"), 100, min = 0, max = 10000), width = 4)
               )),
       tabItem("portion",
               box(
@@ -64,6 +67,15 @@ ui <- dashboardPage(
                 background = "yellow",
                 width = 4,
                 textOutput("portion")
+              ),
+              box(
+                numericInput("portion_wtp", em("Expected Willingness to Pay for an Additional QALY:"), 10000, min = 0, max = 100000000), width = 4)
+              ),
+              box(
+                numericInput("portion_int_cost", em("Expected Healthcare Cost with Intervention:"), 500, min = 0, max = 10000), width = 4)
+              ),
+              box(
+                numericInput("portion_bau_cost", em("Expected Healthcare Cost without Intervention:"), 100, min = 0, max = 10000), width = 4)
               ))
     )
 
@@ -98,16 +110,118 @@ server <- function(input, output) {
     return(ICER)
   } 
   
-  ICER_determ <- function(inputdata_determ){
+  ICER_determ <- function(inputdata){
+    setwd("C:/Users/tresc/Dropbox/LSHTM")
+    inputdata <- read.csv(inputdata)
+    inputdata <- as.data.frame(inputdata)
+    
+    #replace intervention cost with our input
+    inputdata$state_cost_intervention[1] <- input$determ_int_cost
+    
+    #replace BAU cost with our input
+    inputdata$state_cost_control[1] <- input$determ_bau_cost
+    
+    costs_intervention <- inputdata$state_distribution_intervention * inputdata$state_costs_intervention
+    total_cost_intervention <- costs_intervention[1]+costs_intervention[2]+costs_intervention[3]
+    QALYs_intervention <- inputdata$state_distribution_intervention * inputdata$state_QALYs
+    total_QALYs_intervention <- QALYs_intervention[1]+QALYs_intervention[2]+QALYs_intervention[3]
+    
+    costs_control <- inputdata$state_distribution_control * inputdata$state_costs_control
+    total_cost_control <- costs_control[1]+costs_control[2]+costs_control[3]
+    QALYs_control <- inputdata$state_distribution_control * inputdata$state_QALYs
+    total_QALYs_control <- QALYs_control[1]+QALYs_control[2]+QALYs_control[3]
+    
+    ICER <- (total_cost_intervention - total_cost_control) / (total_QALYs_intervention - total_QALYs_control)
+    
+    return(ICER)
+  }
+  
+  CEAC_ICER_function <- function(inputdata){
+    setwd("C:/Users/tresc/Dropbox/LSHTM")
+    inputdata <- read.csv(inputdata)
+    inputdata <- as.data.frame(inputdata)
+    
+    #replace intervention cost with our input
+    inputdata$state_costs_intervention[1] <- rnorm(1,input$CEAC_int_cost,100)
+    
+    #replace BAU healthcare cost with our input
+    inputdata$stata_costs_control[1] <- rnorm(1,input$CEAC_bau_cost,100)
+    
+    costs_intervention <- inputdata$state_distribution_intervention * inputdata$state_costs_intervention
+    total_cost_intervention <- costs_intervention[1]+costs_intervention[2]+costs_intervention[3]
+    QALYs_intervention <- inputdata$state_distribution_intervention * inputdata$state_QALYs
+    total_QALYs_intervention <- QALYs_intervention[1]+QALYs_intervention[2]+QALYs_intervention[3]
+    
+    costs_control <- inputdata$state_distribution_control * inputdata$state_costs_control
+    total_cost_control <- costs_control[1]+costs_control[2]+costs_control[3]
+    QALYs_control <- inputdata$state_distribution_control * inputdata$state_QALYs
+    total_QALYs_control <- QALYs_control[1]+QALYs_control[2]+QALYs_control[3]
+    
+    CEAC_ICER <- (total_cost_intervention - total_cost_control) / (total_QALYs_intervention - total_QALYs_control)
+    
+    return(CEAC_ICER)
+  }
+  
+  CEAC <- function(inputdata){
+    
+    ICER_Vector <- c(rep(0,10000))
+    for(i in 1:10000){
+      ICER_Vector[i] <- CEAC_ICER_function(inputdata)
+      rm(i)
+    }
+    
+    density <- ecdf(ICER_Vector)
+    
+    CEAC <- plot(density,
+                 xlab = 'Willingness to Pay to Avert an Additional DALY',
+                 ylab = "Portion of Interventions Cost-Effective",
+                 main = 'Cost Effectiveness Acceptability Curve')
+    
+    return(CEAC)
     
   }
   
-  CEAC <- function(inputdata_CEAC){
+  ICER_portion <- function(inputdata){
+    setwd("C:/Users/tresc/Dropbox/LSHTM")
+    inputdata <- read.csv(inputdata)
+    inputdata <- as.data.frame(inputdata)
     
+    #replace intervention cost with our input
+    inputdata$state_costs_intervention[1] <- rnorm(1,input$portion_int_cost,100)
+    
+    #replace BAU healthcare cost with our input
+    inputdata$stata_costs_control[1] <- rnorm(1,input$portion_bau_cost,100)
+    
+    costs_intervention <- inputdata$state_distribution_intervention * inputdata$state_costs_intervention
+    total_cost_intervention <- costs_intervention[1]+costs_intervention[2]+costs_intervention[3]
+    QALYs_intervention <- inputdata$state_distribution_intervention * inputdata$state_QALYs
+    total_QALYs_intervention <- QALYs_intervention[1]+QALYs_intervention[2]+QALYs_intervention[3]
+    
+    costs_control <- inputdata$state_distribution_control * inputdata$state_costs_control
+    total_cost_control <- costs_control[1]+costs_control[2]+costs_control[3]
+    QALYs_control <- inputdata$state_distribution_control * inputdata$state_QALYs
+    total_QALYs_control <- QALYs_control[1]+QALYs_control[2]+QALYs_control[3]
+    
+    portion_ICER <- (total_cost_intervention - total_cost_control) / (total_QALYs_intervention - total_QALYs_control)
+    
+    return(portion_ICER)
   }
   
-  Portion <- function(inputdata_portion){
+  Portion <- function(inputdata){
+    set.seed(420)
     
+    ICER_Vector <- c(rep(0,10000))
+    
+    for(i in 1:10000){
+      CET <- rnorm(1,input$portion_wtp,2500)
+      if(CET <= ICER_portion("inputdata.csv")){
+        ICER_Vector[i] <- 1} 
+      rm(i)
+    }
+    
+    Answer <- paste(100*mean(ICER_Vector), "% of Interventions are Cost-Effective")
+    
+    return(Answer)
   }
   
   output$ICER <- renderText({
