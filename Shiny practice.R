@@ -46,7 +46,7 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 6),
               box(numericInput("CEAC_bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4) 
+                               100, min = 0, max = 10000), width = 6) 
       ),
       tabItem("determ",
               box(
@@ -147,7 +147,7 @@ server <- function(input, output) {
     inputdata$state_costs_intervention[1] <- rnorm(1,input$CEAC_int_cost,100)
     
     #replace BAU healthcare cost with our input
-    inputdata$stata_costs_control[1] <- rnorm(1,input$CEAC_bau_cost,100)
+    inputdata$state_costs_control[1] <- rnorm(1,input$CEAC_bau_cost,100)
     
     costs_intervention <- inputdata$state_distribution_intervention * inputdata$state_costs_intervention
     total_cost_intervention <- costs_intervention[1]+costs_intervention[2]+costs_intervention[3]
@@ -192,7 +192,7 @@ server <- function(input, output) {
     inputdata$state_costs_intervention[1] <- rnorm(1,input$portion_int_cost,100)
     
     #replace BAU healthcare cost with our input
-    inputdata$stata_costs_control[1] <- rnorm(1,input$portion_bau_cost,100)
+    inputdata$state_costs_control[1] <- rnorm(1,input$portion_bau_cost,100)
     
     costs_intervention <- inputdata$state_distribution_intervention * inputdata$state_costs_intervention
     total_cost_intervention <- costs_intervention[1]+costs_intervention[2]+costs_intervention[3]
@@ -215,7 +215,7 @@ server <- function(input, output) {
     
     for(i in 1:10000){
       CET <- rnorm(1,input$portion_wtp,2500)
-      if(CET <= ICER_portion("inputdata.csv")){
+      if(CET >= ICER_portion("inputdata.csv")){
         ICER_Vector_Portion[i] <- 1} 
       rm(i)
     }
