@@ -32,7 +32,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 4),
               box(numericInput("bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4)       
+                               100, min = 0, max = 10000), width = 4),
+              box(fileInput("rand_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
       ),
       tabItem("CEAC",
               box(
@@ -46,7 +50,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 6),
               box(numericInput("CEAC_bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 6) 
+                               100, min = 0, max = 10000), width = 6),
+              box(fileInput("CEAC_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
       ),
       tabItem("determ",
               box(
@@ -60,7 +68,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 4),
               box(numericInput("determ_bau_cost", 
                                em("Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4)
+                               100, min = 0, max = 10000), width = 4),
+              box(fileInput("determ_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
               ),
       tabItem("portion",
               box(
@@ -77,7 +89,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 4),
               box(numericInput("portion_bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4)
+                               100, min = 0, max = 10000), width = 4),
+              box(fileInput("portion_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
               )
     )
 
@@ -87,8 +103,14 @@ ui <- dashboardPage(
 
 server <- function(input, output) {
   ICER_rand <- function(inputdata){
-    setwd("C:/Users/tresc/Dropbox/LSHTM")
-    inputdata <- read.csv(inputdata)
+    
+    inputfile <- input$rand_file
+    
+    if (is.null(inputfile))
+      return("Same as last time, you need to choose a file")
+    
+    inputdata <- read.csv(inputfile$datapath)
+    
     inputdata <- as.data.frame(inputdata)
     
     #replace intervention cost with a random draw
@@ -113,8 +135,14 @@ server <- function(input, output) {
   } 
   
   ICER_determ <- function(inputdata){
-    setwd("C:/Users/tresc/Dropbox/LSHTM")
-    inputdata <- read.csv(inputdata)
+    
+    inputfile <- input$determ_file
+    
+    if (is.null(inputfile))
+      return("You need to choose a file, I'm not a mind reader")
+    
+    inputdata <- read.csv(inputfile$datapath)
+    
     inputdata <- as.data.frame(inputdata)
     
     #replace intervention cost with our input
@@ -139,8 +167,11 @@ server <- function(input, output) {
   }
   
   CEAC_ICER_function <- function(inputdata){
-    setwd("C:/Users/tresc/Dropbox/LSHTM")
-    inputdata <- read.csv(inputdata)
+    
+    inputfile <- input$CEAC_file
+    
+    inputdata <- read.csv(inputfile$datapath)
+    
     inputdata <- as.data.frame(inputdata)
     
     #replace intervention cost with our input
@@ -184,8 +215,11 @@ server <- function(input, output) {
   }
   
   ICER_portion <- function(inputdata){
-    setwd("C:/Users/tresc/Dropbox/LSHTM")
-    inputdata <- read.csv(inputdata)
+    
+    inputfile <- input$portion_file
+    
+    inputdata <- read.csv(inputfile$datapath)
+    
     inputdata <- as.data.frame(inputdata)
     
     #replace intervention cost with our input
@@ -215,7 +249,7 @@ server <- function(input, output) {
     
     for(i in 1:10000){
       CET <- rnorm(1,input$portion_wtp,2500)
-      if(CET >= ICER_portion("inputdata.csv")){
+      if(CET >= ICER_portion(inputdata)){
         ICER_Vector_Portion[i] <- 1} 
       rm(i)
     }
@@ -223,6 +257,7 @@ server <- function(input, output) {
     Answer <- c(100*mean(ICER_Vector_Portion), " % of Interventions are Cost-Effective")
     
     return(Answer)
+
   }
   
   output$ICER <- renderText({
