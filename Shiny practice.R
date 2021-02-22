@@ -67,7 +67,7 @@ ui <- dashboardPage(
                 title = "Portion of Interventions that are Cost Effective",
                 background = "yellow",
                 width = 4,
-                textOutput("portion")
+                textOutput("portion_effective")
               ),
               box(numericInput("portion_wtp", 
                                em("Expected Willingness to Pay for an Additional QALY:"), 
@@ -209,19 +209,18 @@ server <- function(input, output) {
     return(portion_ICER)
   }
   
-  portion <- function(inputdata){
-    set.seed(420)
+  portion_effective <- function(inputdata){
     
-    ICER_Vector <- c(rep(0,10000))
+    ICER_Vector_Portion <- c(rep(0,10000))
     
     for(i in 1:10000){
       CET <- rnorm(1,input$portion_wtp,2500)
       if(CET <= ICER_portion("inputdata.csv")){
-        ICER_Vector[i] <- 1} 
+        ICER_Vector_Portion[i] <- 1} 
       rm(i)
     }
     
-    Answer <- paste(100*mean(ICER_Vector), "% of Interventions are Cost-Effective")
+    Answer <- c(100*mean(ICER_Vector_Portion), " % of Interventions are Cost-Effective")
     
     return(Answer)
   }
@@ -238,8 +237,8 @@ server <- function(input, output) {
     CEAC("inputdata.csv")
   })
   
-  output$portion <- renderText ({
-    portion("inputdata.csv")
+  output$portion_effective <- renderText ({
+    portion_effective("inputdata.csv")
   })
 }
 
