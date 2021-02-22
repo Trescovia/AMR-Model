@@ -32,7 +32,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 4),
               box(numericInput("bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4)       
+                               100, min = 0, max = 10000), width = 4),
+              box(fileInput("rand_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
       ),
       tabItem("CEAC",
               box(
@@ -46,7 +50,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 6),
               box(numericInput("CEAC_bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 6) 
+                               100, min = 0, max = 10000), width = 6),
+              box(fileInput("rand_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
       ),
       tabItem("determ",
               box(
@@ -60,7 +68,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 4),
               box(numericInput("determ_bau_cost", 
                                em("Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4)
+                               100, min = 0, max = 10000), width = 4),
+              box(fileInput("rand_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
               ),
       tabItem("portion",
               box(
@@ -77,7 +89,11 @@ ui <- dashboardPage(
                                500, min = 0, max = 10000), width = 4),
               box(numericInput("portion_bau_cost", 
                                em("Expected Healthcare Cost without Intervention:"), 
-                               100, min = 0, max = 10000), width = 4)
+                               100, min = 0, max = 10000), width = 4),
+              box(fileInput("rand_file", 
+                            "Upload Parameter Spreadsheet",
+                            multiple = F,
+                            accept= c("csv", "comma-separated-values", ".csv")))
               )
     )
 
