@@ -1,0 +1,13 @@
+name: PSA_App
+title: PSA_App
+username:
+account: trescovius
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3678568
+bundleId: 4285211
+url: https://trescovius.shinyapps.io/PSA_App/
+when: 1614597744.3962
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: A simple ICER function that reads from CSV.R|Code Itself.R|inputdata.csv|optimistic inputs.csv|pessimistic inputs.csv|README.md|Simple Tabs.R|Population data for ARIMA/API_SP.POP.TOTL_DS2_en_csv_v2_2077948.csv|Population data for ARIMA/Metadata_Country_API_SP.POP.TOTL_DS2_en_csv_v2_2077948.csv|Population data for ARIMA/Metadata_Indicator_API_SP.POP.TOTL_DS2_en_csv_v2_2077948.csv|Population data for ARIMA/Vietnam Population.csv
