@@ -684,4 +684,4 @@ CEAC <- plot(density,
              xlab = 'Willingness to Pay per QALY',
              ylab = "Portion of Interventions Cost-Effective",
              main = 'Cost Effectiveness Acceptability Curve')
-abline(v = c(200,3000), col = c("blue", "red"), lty = c(2,2), lwd = c(2,2))
+abline(v = c(200,3000), col = c("blue", "red"), lty = c(2,2), lwd = c(2,2)) 
