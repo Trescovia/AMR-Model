@@ -22,16 +22,16 @@ futurepop <- predict$mean
 births <- numeric()
 for (i in 1:49) {
   births[i] <- futurepop[i+1] - futurepop[i]
-} #atm births[1] shows births in 2020
+} #atm births[1] shows NET births in 2020
 
-births <- births[2:49] #now births[1] is births in 2021
+births <- births[2:49] #now births[1] is NET births in 2021
 
 birthrate <- numeric()
 for (i in 1:49) {
   birthrate[i] <- (futurepop[i+1] - futurepop[i])/futurepop[i]
-} #atm birthrate[1] shows birthrate in 2020
+} #atm birthrate[1] shows NET birthrate in 2020
 
-birthrate <- birthrate[2:49] #now birthrate[1] shows birthrate in 2021
+birthrate <- birthrate[2:49] #now birthrate[1] shows NET birthrate in 2021
 
 #upper bound population projection
 futurepop_up <- predict$upper
@@ -54,6 +54,9 @@ for (i in 1:49){
 } #atm birthrate_low[1] shows rate for 2020
 
 birthrate_low <- birthrate_low[2:49] #now it shows lower rates for 2021
+
+##here I have predicted net births and will use this as the 'birth' parameter. This means that the background 
+##mortality will be set to 0 because the net birthrate already accounts for background mortality
 
 ####dependency ratio
 
@@ -166,7 +169,7 @@ wtp <- 2000 ## willingness to pay per QALY gained
 inputs <- read.csv("C:/Users/tresc/Desktop/input_V.csv")
 inputs <- as.data.table(inputs)
 
- model <- function(inputs){
+model <- function(inputs){
   
   inputs[ , value := as.numeric(as.character(value))]
   
@@ -215,9 +218,9 @@ inputs <- as.data.table(inputs)
   m_param[ , "mort_s"] <- rep(human[parameter=="s_dead",value], n.t)
   m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]), n.t)
   m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]), n.t)
-  m_param[ , "birth"] <- birthrate[1:n.t]
-  m_param[ , "mort_w"] <- rep(0, n.t)
-
+  m_param[ , "birth"] <- birthrate[1:n.t] ##set to be predicted net births
+  m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births
+  
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
   ## the difference equation function: 
@@ -276,7 +279,7 @@ inputs <- as.data.table(inputs)
   rwd_i <- c(1,r_r,r_s,r_d) 
   
   ##############################################################################
-  #have changed health state rewards to be 1, 0.98, 0 
+  #have changed health state rewards to be 1, 0.98 0.975, 0 
   ##############################################################################
   
   ## start at cycle 1 so you do not multiply initial state vector 
@@ -290,8 +293,9 @@ inputs <- as.data.table(inputs)
   }
   
   #### Productivity Costs ###########
-  #all zero at present since we are just counting the benefit of hours worked
-
+  #all zero at present since we are just counting the benefit of hours worked - the effective productivity 'cost'
+  #will actually be the difference in rewards
+  
   m_cost_prod <- matrix(rep(0),nrow = n.t, ncol = length(parameter_names))
   colnames(m_cost_prod) <- parameter_names
   rownames(m_cost_prod) <- paste("cycle", 0:(n.t-1), sep = "")
@@ -309,7 +313,7 @@ inputs <- as.data.table(inputs)
       m_cost_prod[i,j] <- f_di(m_cost_prod[i-1,j],dr)
     }
   }
-
+  
   
   #### Productivity Rewards #########
   
@@ -317,21 +321,13 @@ inputs <- as.data.table(inputs)
   colnames(m_rwd_prod) <- parameter_names
   rownames(m_rwd_prod) <- paste("cycle", 0:(n.t-1), sep = "")
   
-  #r_r_prod <- human[parameter=="lfpr",value]*human[parameter=="prod",value]*0.94 #not accounting for longer stay if res
-  
-  r_r_prod <- human[parameter=="prod",value]*0.94 #not accounting for longer stay if res
-  
-  #r_s_prod <- human[parameter=="lfpr",value]*human[parameter=="prod",value]*0.94 
+  r_r_prod <- human[parameter=="prod",value]*0.923504449 #accounting for longer stay if res
   
   r_s_prod <- human[parameter=="prod",value]*0.94
   
   r_d_prod <- 0
   
-  #r_w_prod <- human[parameter=="lfpr",value]*human[parameter=="prod",value]
-  
   r_w_prod <- human[parameter=="prod",value]
-  
-  #rwd_i_prod <- c(r_w_prod, r_r_prod, r_s_prod, r_d_prod)
   
   #multiply the initial productivity rewards by the portion of people who are working
   rwd_i_prod <- c(portion_working[1]*r_w_prod, portion_working[1]*r_r_prod, portion_working[1]*r_s_prod, portion_working[1]*r_d_prod)
@@ -354,10 +350,10 @@ inputs <- as.data.table(inputs)
     for (i in 3:(n.t)) {
       m_rwd_prod[i,j] <- m_rwd_prod[i,j]*portion_working[i]
     }
-  }
+  } 
   
   ###################*****ANIMAL MODEL*****###########################
-
+  
   state_names_a <- c("well", "res","sus","fallen","sold") ## the compartments
   transition_names_a  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s","w_sold")  ## the rates
   ## birth = replacement in this scenario
@@ -405,12 +401,12 @@ inputs <- as.data.table(inputs)
     ### split over time to allow for transition probabilities to sum to 1
     ### first transitions
     i<- 2 ## row 2 definitions ## background mortality happens at beginning of cycle 
-      m_param_a_temp[i,"well"] <- m_param_a_temp[i-1,"well"] -(m_param_a_temp[i-1,"r"]*m_param_a_temp[i-1,"well"]) -
-        (m_param_a_temp[i-1,"s"]*m_param_a_temp[i-1,"well"]) - (m_param_a_temp[i-1,"mort_w"]*m_param_a_temp[i-1,"well"])
-      m_param_a_temp[i,"res"] <- m_param_a_temp[i-1,"res"] + (m_param_a_temp[i-1,"r"]*m_param_a_temp[i-1,"well"]) 
-      m_param_a_temp[i,"sus"] <- m_param_a_temp[i-1,"sus"] + (m_param_a_temp[i-1,"s"]*m_param_a_temp[i-1,"well"])
-      m_param_a_temp[i,"fallen"] <- (m_param_a_temp[i-1,"mort_w"]*m_param_a_temp[i-1,"well"]) 
-      
+    m_param_a_temp[i,"well"] <- m_param_a_temp[i-1,"well"] -(m_param_a_temp[i-1,"r"]*m_param_a_temp[i-1,"well"]) -
+      (m_param_a_temp[i-1,"s"]*m_param_a_temp[i-1,"well"]) - (m_param_a_temp[i-1,"mort_w"]*m_param_a_temp[i-1,"well"])
+    m_param_a_temp[i,"res"] <- m_param_a_temp[i-1,"res"] + (m_param_a_temp[i-1,"r"]*m_param_a_temp[i-1,"well"]) 
+    m_param_a_temp[i,"sus"] <- m_param_a_temp[i-1,"sus"] + (m_param_a_temp[i-1,"s"]*m_param_a_temp[i-1,"well"])
+    m_param_a_temp[i,"fallen"] <- (m_param_a_temp[i-1,"mort_w"]*m_param_a_temp[i-1,"well"]) 
+    
     i <- 3 ###
     m_param_a_temp[i,"well"] <-  m_param_a_temp[i-1,"well"]+(m_param_a_temp[i-1,"rec_r"]*m_param_a_temp[i-1,"res"])+ 
       (m_param_a_temp[i-1,"rec_s"]*m_param_a_temp[i-1,"sus"])
@@ -423,7 +419,7 @@ inputs <- as.data.table(inputs)
     # so avoids double counting
     
     i <-4 ## moving to sold/not-sold states
-      m_param_a_temp[i,"sold"] <- (m_param_a_temp[i-1,"w_sold"]*m_param_a_temp[i-1,"well"])
+    m_param_a_temp[i,"sold"] <- (m_param_a_temp[i-1,"w_sold"]*m_param_a_temp[i-1,"well"])
     
     ### aggregate
     m_a_sum <- colSums(m_param_a_temp) ## sum over the 4 rows
@@ -511,7 +507,7 @@ inputs <- as.data.table(inputs)
   
   m_param_a2 <- f_animal_epi(m_param_a2, n.t)
   ### !!! need to check this because giving minus values
-
+  
   ### costs and rewards are the same for healthcare system
   ## rewards are the same for farms
   # costs change for each well add a cost of intervention
@@ -614,14 +610,14 @@ inputs <- as.data.table(inputs)
                         icer=icer, CBR = CBR, NMB_H=NMB_H, NMB_A=NMB_A, icer_prod = icer_prod, 
                         NMB_prod = NMB_prod, net_monetary_gain_macro = net_monetary_gain_macro,
                         NMB_macro = NMB_macro, icer_macro = icer_macro)
- outputs
-    
-   return(outputs)
-#   
- }
+  outputs
+  
+  return(outputs)
+  #   
+}
 # 
- model(inputs)
- 
+model(inputs)
+
 ##check the cost-effectiveness as a function of intervention cost per chicken
 ##and plot the cost-effective space
 inputs2 <- as.data.table(read.csv("C:/Users/tresc/Desktop/input_V.csv"))
