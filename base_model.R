@@ -166,7 +166,7 @@ dr <- 0.035 ## discount rate
 wtp <- 2000 ## willingness to pay per QALY gained
 
 ############# model functions
-inputs <- read.csv("C:/Users/tresc/Desktop/input_V.csv")
+inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv")
 inputs <- as.data.table(inputs)
 
 model <- function(inputs){
@@ -620,7 +620,7 @@ model(inputs)
 
 ##check the cost-effectiveness as a function of intervention cost per chicken
 ##and plot the cost-effective space
-inputs2 <- as.data.table(read.csv("C:/Users/tresc/Desktop/input_V.csv"))
+inputs2 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
 interv_cost_vector <- c(rep(0,10000))
 wtp_vector <- c(rep(0,10000))
 
@@ -646,13 +646,13 @@ plot(cost_effective_points)
 
 ##create a CEAC using the distributions in our parameter sheet
 
-inputs3 <- as.data.table(read.csv("C:/Users/tresc/Desktop/input_V.csv"))
+inputs3 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
 ceac_icer_vector <- c(rep(0,1000))
 
 for(i in 1:1000){
   
   #load dataset
-  inputs3 <- as.data.table(read.csv("C:/Users/tresc/Desktop/input_V.csv"))
+  inputs3 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
   
   #random draws of normally distributed variables
   inputs3[13,4] <- rnorm(1,as.numeric(inputs3[13,4]),as.numeric((inputs3[13,4] - inputs3[13,6])/1.96))
