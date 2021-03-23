@@ -685,3 +685,194 @@ CEAC <- plot(density,
              ylab = "Portion of Interventions Cost-Effective",
              main = 'Cost Effectiveness Acceptability Curve')
 abline(v = c(200,3000), col = c("blue", "red"), lty = c(2,2), lwd = c(2,2)) 
+
+#tornado plot
+#get base case ICER
+tornado_base <- as.data.frame(model(inputs))[1,13]
+
+#prod growth
+inputstornado <- inputs 
+inputstornado[33,4] <- inputs[33,6]
+prod_growth_low <- as.data.frame(model(inputstornado))[1,13]
+prod_growth_low <- prod_growth_low - tornado_base
+inputstornado[33,4] <- inputs[33,7]
+prod_growth_high <- as.data.frame(model(inputstornado))[1,13]
+prod_growth_high <- prod_growth_high - tornado_base
+
+#reduction in animal resistance
+inputstornado <- inputs
+inputstornado[26,4] <- inputs[33,6]
+u_RA_low <- as.data.frame(model(inputstornado))[1,13]
+u_RA_low <- u_RA_low - tornado_base
+inputstornado[26,4] <- inputs[33,7]
+u_RA_high <- as.data.frame(model(inputstornado))[1,13]
+u_RA_high <- u_RA_high - tornado_base
+
+#reduction in human resistance
+inputstornado <- inputs
+inputstornado[25,4] <- inputs[25,6]
+u_RH_low <- as.data.frame(model(inputstornado))[1,13]
+u_RH_low <- u_RH_low - tornado_base
+inputstornado[25,4] <- inputs[25,7]
+u_RH_high <- as.data.frame(model(inputstornado))[1,13]
+u_RH_high <- u_RH_high - tornado_base
+
+#intervention cost per chicken
+inputstornado <- inputs
+inputstornado[24,4] <- inputs[24,6]
+int_cost_low <- as.data.frame(model(inputstornado))[1,13]
+int_cost_low <- int_cost_low - tornado_base
+inputstornado[24,4] <- inputs[24,7]
+int_cost_high <- as.data.frame(model(inputstornado))[1,13]
+int_cost_high <- int_cost_high - tornado_base
+
+#cost of treating a resistant infection in animals
+inputstornado <- inputs
+inputstornado[22,4] <- inputs[22,6]
+res_treat_a_low <- as.data.frame(model(inputstornado))[1,13]
+res_treat_a_low <- res_treat_a_low - tornado_base
+inputstornado[22,4] <- inputs[22,7]
+res_treat_a_high <- as.data.frame(model(inputstornado))[1,13]
+res_treat_a_high <- res_treat_a_high - tornado_base
+
+#cost of treating a susceptible infection in animals
+inputstornado <- inputs
+inputstornado[21,4] <- inputs[21,6]
+sus_treat_a_low <- as.data.frame(model(inputstornado))[1,13]
+sus_treat_a_low <- sus_treat_a_low - tornado_base
+inputstornado[21,4] <- inputs[21,7]
+sus_treat_a_high <- as.data.frame(model(inputstornado))[1,13]
+sus_treat_a_high <- sus_treat_a_high - tornado_base
+
+#animal mortality from resistant infection
+inputstornado <- inputs
+inputstornado[20,4] <- inputs[20,6]
+res_mort_a_low <- as.data.frame(model(inputstornado))[1,13]
+res_mort_a_low <- res_mort_a_low - tornado_base
+inputstornado[20,4] <- inputs[20,7]
+res_mort_a_high <- as.data.frame(model(inputstornado))[1,13] 
+res_mort_a_high <- res_mort_a_high - tornado_base
+
+#animal mortality from susceptible infection
+inputstornado <- inputs
+inputstornado[19,4] <- inputs[19,6]
+sus_mort_a_low <- as.data.frame(model(inputstornado))[1,13]
+sus_mort_a_low <- sus_mort_a_low - tornado_base
+inputstornado[19,4] <- inputs[19,7]
+sus_mort_a_high <- as.data.frame(model(inputstornado))[1,13] 
+sus_mort_a_high <- sus_mort_a_high - tornado_base
+
+#income per chicken sold
+inputstornado <- inputs
+inputstornado[18,4] <- inputs[18,6]
+income_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+income_chicken_low <- income_chicken_low - tornado_base
+inputstornado[18,4] <- inputs[18,7]
+income_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+income_chicken_high <- income_chicken_high - tornado_base
+
+#cost (financial, not emotional) of raising a chicken
+inputstornado <- inputs
+inputstornado[17,4] <- inputs[17,6]
+upkeep_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+upkeep_chicken_low <- upkeep_chicken_low - tornado_base
+inputstornado[17,4] <- inputs[17,7]
+upkeep_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+upkeep_chicken_high <- upkeep_chicken_high - tornado_base
+
+#probability of an animal getting a susceptible infection
+inputstornado <- inputs
+inputstornado[16,4] <- inputs[16,6]
+sus_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+sus_chicken_low <- sus_chicken_low - tornado_base
+inputstornado[16,4] <- inputs[16,7]
+sus_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+sus_chicken_high <- sus_chicken_high - tornado_base
+
+#probability of an animal getting a resistant infection
+inputstornado <- inputs
+inputstornado[15,4] <- inputs[15,6]
+res_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+res_chicken_low <- res_chicken_low - tornado_base
+inputstornado[15,4] <- inputs[15,7]
+res_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+res_chicken_high <- res_chicken_high - tornado_base
+
+#chicken background mortality
+inputstornado <- inputs
+inputstornado[13,4] <- inputs[13,6]
+chicken_mort_low <- as.data.frame(model(inputstornado))[1,13]
+chicken_mort_low <- chicken_mort_low - tornado_base
+inputstornado[13,4] <- inputs[13,7]
+chicken_mort_high <- as.data.frame(model(inputstornado))[1,13] 
+chicken_mort_high <- chicken_mort_high - tornado_base
+
+#hospital cost of treating a resistant infection in humans
+inputstornado <- inputs
+inputstornado[8,4] <- 0.5 * inputstornado[8,4]
+res_treat_low <- as.data.frame(model(inputstornado))[1,13]
+res_treat_low <- res_treat_low - tornado_base
+inputstornado[8,4] <- 1.5 * inputstornado[8,4]
+res_treat_high <- as.data.frame(model(inputstornado))[1,13] 
+res_treat_high <- res_treat_high - tornado_base
+
+#hospital cost of treating a susceptible infection in humans
+inputstornado <- inputs
+inputstornado[7,4] <- 0.5 * inputstornado[7,4]
+sus_treat_low <- as.data.frame(model(inputstornado))[1,13]
+sus_treat_low <- sus_treat_low - tornado_base
+inputstornado[7,4] <- 1.5 * inputstornado[7,4]
+sus_treat_high <- as.data.frame(model(inputstornado))[1,13] 
+sus_treat_high <- sus_treat_high - tornado_base
+
+#mortality of resistant cases
+inputstornado <- inputs
+inputstornado[6,4] <- 0.5 * inputstornado[6,4]
+res_mort_low <- as.data.frame(model(inputstornado))[1,13]
+res_mort_low <- res_mort_low - tornado_base
+inputstornado[6,4] <- 1.5 * inputstornado[6,4]
+res_mort_high <- as.data.frame(model(inputstornado))[1,13]
+res_mort_high <- res_mort_high - tornado_base
+
+#mortality of susceptible cases
+inputstornado <- inputs
+inputstornado[5,4] <- 0.5 * inputstornado[5,4]
+sus_mort_low <- as.data.frame(model(inputstornado))[1,13]
+sus_mort_low <- sus_mort_low - tornado_base
+inputstornado[5,4] <- 1.5 * inputstornado[5,4]
+sus_mort_high <- as.data.frame(model(inputstornado))[1,13]
+sus_mort_high <- sus_mort_high - tornado_base
+
+tornado <- data.frame(variable = c("productivity growth",
+                                   "reduction in animal AMR",
+                                   "reduction in human AMR",
+                                   "intervention cost per chicken",
+                                   "cost of treating a resistant infection in chickens",
+                                   "cost of treating a susceptible infection in chickens",
+                                   "chicken mortality from resistant infection",
+                                   "chicken mortality from susceptible infection",
+                                   "income per chicken sold",
+                                   "cost (financial, not emotional) of raising a chicken",
+                                   "probability of a chicken getting a susceptible infection",
+                                   "probability of a chicken getting a resistant infection",
+                                   "chicken background mortality",
+                                   "hospital cost of treating a resistant infection in humans",
+                                   "hospital cost of treating a susceptible infection in humans",
+                                   "mortality of resistant cases",
+                                   "mortality of susceptible cases"),
+                      min = c(prod_growth_low, u_RA_low, u_RH_low, int_cost_low, res_treat_a_low, sus_treat_a_low, 
+                              res_mort_a_low, sus_mort_a_low, income_chicken_low, upkeep_chicken_low, sus_chicken_low, res_chicken_low, 
+                              chicken_mort_low, res_treat_low, sus_treat_low, res_mort_low, sus_mort_low),
+                      max = c(prod_growth_high,u_RA_high, u_RH_high, int_cost_high, res_treat_a_high, sus_treat_a_high,
+                              res_mort_a_high, sus_mort_a_high, income_chicken_high, upkeep_chicken_high, sus_chicken_high, res_chicken_high,
+                              chicken_mort_high, res_treat_high, sus_treat_high, res_mort_high, sus_mort_high))
+
+
+ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
+  geom_linerange(size = 10) +
+  coord_flip() +
+  xlab("") +
+  ggtitle("Change in Macro-Level ICER along Range of Each Parameter")+
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15))
