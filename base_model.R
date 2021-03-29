@@ -701,10 +701,10 @@ prod_growth_high <- prod_growth_high - tornado_base
 
 #reduction in animal resistance
 inputstornado <- inputs
-inputstornado[26,4] <- inputs[33,6]
+inputstornado[26,4] <- inputs[26,6]
 u_RA_low <- as.data.frame(model(inputstornado))[1,13]
 u_RA_low <- u_RA_low - tornado_base
-inputstornado[26,4] <- inputs[33,7]
+inputstornado[26,4] <- inputs[26,7]
 u_RA_high <- as.data.frame(model(inputstornado))[1,13]
 u_RA_high <- u_RA_high - tornado_base
 
@@ -809,37 +809,37 @@ chicken_mort_high <- chicken_mort_high - tornado_base
 
 #hospital cost of treating a resistant infection in humans
 inputstornado <- inputs
-inputstornado[8,4] <- 0.5 * inputstornado[8,4]
+inputstornado[8,4] <- 0.5 * inputs[8,4]
 res_treat_low <- as.data.frame(model(inputstornado))[1,13]
 res_treat_low <- res_treat_low - tornado_base
-inputstornado[8,4] <- 1.5 * inputstornado[8,4]
+inputstornado[8,4] <- 1.5 * inputs[8,4]
 res_treat_high <- as.data.frame(model(inputstornado))[1,13] 
 res_treat_high <- res_treat_high - tornado_base
 
 #hospital cost of treating a susceptible infection in humans
 inputstornado <- inputs
-inputstornado[7,4] <- 0.5 * inputstornado[7,4]
+inputstornado[7,4] <- 0.5 * inputs[7,4]
 sus_treat_low <- as.data.frame(model(inputstornado))[1,13]
 sus_treat_low <- sus_treat_low - tornado_base
-inputstornado[7,4] <- 1.5 * inputstornado[7,4]
+inputstornado[7,4] <- 1.5 * inputs[7,4]
 sus_treat_high <- as.data.frame(model(inputstornado))[1,13] 
 sus_treat_high <- sus_treat_high - tornado_base
 
 #mortality of resistant cases
 inputstornado <- inputs
-inputstornado[6,4] <- 0.5 * inputstornado[6,4]
+inputstornado[6,4] <- 0.5 * inputs[6,4]
 res_mort_low <- as.data.frame(model(inputstornado))[1,13]
 res_mort_low <- res_mort_low - tornado_base
-inputstornado[6,4] <- 1.5 * inputstornado[6,4]
+inputstornado[6,4] <- 1.5 * inputs[6,4]
 res_mort_high <- as.data.frame(model(inputstornado))[1,13]
 res_mort_high <- res_mort_high - tornado_base
 
 #mortality of susceptible cases
 inputstornado <- inputs
-inputstornado[5,4] <- 0.5 * inputstornado[5,4]
+inputstornado[5,4] <- 0.5 * inputs[5,4]
 sus_mort_low <- as.data.frame(model(inputstornado))[1,13]
 sus_mort_low <- sus_mort_low - tornado_base
-inputstornado[5,4] <- 1.5 * inputstornado[5,4]
+inputstornado[5,4] <- 1.5 * inputs[5,4]
 sus_mort_high <- as.data.frame(model(inputstornado))[1,13]
 sus_mort_high <- sus_mort_high - tornado_base
 

@@ -22,6 +22,7 @@ animal_0,r_dead,"proportion with susceptible infection that die (unsold, i.e. fa
 animal_0,s_cost,cost of treating susceptible infection,1,lognormal,0.75,1.25,
 animal_0,r_cost,cost of treating resistant infection,2,uniform,1.5,2.5,
 animal_0,annual_cycles,number of annual production cycles for chickens,3,NA,,,
+animal_0,amu_a_growth,annual growth in animal antimicrobial use,0.0483,,,,from van Boeckel
 intervention,int_cost_per,hypothetical intervention cost per animal,0.25,uniform,0,0.3,
 intervention,u_RH,reduction in resistance in humans from reduction in antibiotic usage in animals,0.16,beta,0.12,0.2,
 intervention,u_RA,reduction in resistance in animals from reduction in antibiotic usage in animals,0.18,beta,0.135,0.225,
