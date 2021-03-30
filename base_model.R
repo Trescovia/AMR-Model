@@ -520,20 +520,39 @@ model <- function(inputs){
   
   m_param2 <- f_human_epi(m_param2, n.t)
   
-  r_vec_2 <- as.vector(rep(0,(n.t)))
-  for(i in 1:(n.t)){
-  r_vec_2[i] <- (r_vec[i] - r_vec[i]*intervention[parameter=="u_RA",value])   
-  }
+  #r_vec_2 <- as.vector(rep(0,(n.t)))
+  #for(i in 1:(n.t)){
+  #r_vec_2[i] <- (r_vec[i] - r_vec[i]*intervention[parameter=="u_RA",value])   
+  #}
   
   ## animals
+  
+  #reset m_param_a_base so that the intervention case starts from the same point as base case
+  
+  m_param_a_base <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
+  colnames(m_param_a_base) <- parameter_names_a
+  rownames(m_param_a_base) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  
+  m_param_a_base[ , "r"] <- rep(animal[parameter=="well_r",value], n.t)
+  #m_param_a_base[ , "r"] <- r_vec
+  m_param_a_base[ , "s"] <- rep(animal[parameter=="well_s",value], n.t)
+  m_param_a_base[ , "mort_s"] <- rep(animal[parameter=="s_dead",value], n.t)
+  m_param_a_base[ , "mort_r"] <- rep(animal[parameter=="r_dead",value], n.t)
+  m_param_a_base[ , "rec_r"] <- rep(1-(m_param_a_base[1,"mort_r"]), n.t)
+  m_param_a_base[ , "rec_s"] <- rep(1-(m_param_a_base[1,"mort_s"]), n.t)
+  m_param_a_base[ , "birth"] <- rep(animal[parameter=="birth_well",value], n.t) ## !!! doesn't really do anything for now given restructure 
+  m_param_a_base[ , "mort_w"] <- rep(animal[parameter=="well_dead",value], n.t)
+  m_param_a_base[ , "w_sold"] <- rep(1, n.t) 
+  
+  m_param_a_base[1, 1:length(state_names_a)] <- state_i_a
+  
   m_param_a2 <- m_param_a_base
   m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]), n.t)
-  m_param_a2[ , "r"] <- r_vec_2
+  #m_param_a2[ , "r"] <- r_vec_2
   m_param_a2[ , 1:length(state_names_a)] <- 0
   m_param_a2[1, 1:length(state_names_a)] <- state_i_a
   
   m_param_a2 <- f_animal_epi(m_param_a2, n.t)
-  ### !!! need to check this because giving minus values
   
   ### costs and rewards are the same for healthcare system
   ## rewards are the same for farms
