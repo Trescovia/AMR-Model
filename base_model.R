@@ -9,6 +9,7 @@ library("dynlm")
 library("seastests")
 library("forecast")
 library("TSA")
+library("epiR")
 
 pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
@@ -876,3 +877,30 @@ ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
   geom_hline(yintercept = 0, linetype = "dotted") +
   theme_bw() +
   theme(axis.text = element_text(size = 15))
+
+#exploring discount rates
+model(inputs)
+dr <- 0.094
+model(inputs) #becomes significantly less cost-effective with a higher discount rate
+dr <- 0.035
+
+dr_vector <- as.vector(seq(from = 0, to = 0.12, by = 0.0001))
+dr_icer <- as.vector(rep(0,1201))
+
+for(i in 1:1201){
+  dr <- dr_vector[i]
+  dr_icer[i] <- as.data.frame(model(inputs))[1,13]
+}
+
+dr_df <- as.data.frame(cbind(dr_vector, dr_icer))
+colnames(dr_df) <- c("Discount Rate", "Macro-Level ICER")
+
+plot(dr_df$`Discount Rate`, dr_df$`Macro-Level ICER`)
+
+ggplot(dr_df, aes(x=dr_vector, y=dr_icer)) +
+  geom_point()+
+  geom_vline(xintercept = 0.03, linetype = "dotted")+
+  geom_vline(xintercept = 0.066, lty = "dashed")+
+  geom_vline(xintercept = 0.094)+
+  ggtitle("Macro-Level ICER at Different Levels of the Discount Rate")
+
