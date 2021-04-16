@@ -10,6 +10,9 @@ library("seastests")
 library("forecast")
 library("TSA")
 library("epiR")
+library("extraDistr")
+library("MonoInc")
+library("pksensi")
 
 pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
@@ -904,3 +907,145 @@ ggplot(dr_df, aes(x=dr_vector, y=dr_icer)) +
   geom_vline(xintercept = 0.094)+
   ggtitle("Macro-Level ICER at Different Levels of the Discount Rate")
 
+################################################################################
+################################################################################
+
+#Partial Rank Correlation Coefficient
+#parameters to vary: same as in CEAC, but now add discount rate
+prcc_df <- data.table()
+
+prcc_df$a_mort <- rep(0,10000)
+prcc_df$a_inc <- rep(0,10000)
+prcc_df$prod_growth <- rep(0,10000)
+prcc_df$a_res_cost <- rep(0,10000)
+prcc_df$a_int_cost <- rep(0,10000)
+prcc_df$h_res_mort <- rep(0,10000)
+prcc_df$h_sus_mort <- rep(0,10000)
+prcc_df$a_res_prob <- rep(0,10000)
+prcc_df$a_sus_prob <- rep(0,10000)
+prcc_df$a_res_mort <- rep(0,10000)
+prcc_df$a_sus_mort <- rep(0,10000)
+prcc_df$h_amr_fall <- rep(0,10000)
+prcc_df$a_amr_fall <- rep(0,10000)
+prcc_df$dr <- rep(0,10000)
+prcc_df$ICER <- rep(0,10000)
+
+inputs_prcc <- inputs
+
+set.seed(42069)
+
+for(i in 1:10000){
+  inputs_prcc[13,4] <- rnorm(1,as.numeric(inputs_prcc[13,4]),as.numeric((inputs_prcc[13,4] - inputs_prcc[13,6])/1.96)) #animal on-farm mortality
+  inputs_prcc[18,4] <- rnorm(1,as.numeric(inputs_prcc[18,4]),as.numeric((inputs_prcc[18,4] - inputs_prcc[18,6])/1.96)) #income per animal
+  inputs_prcc[33,4] <- rnorm(1,as.numeric(inputs_prcc[33,4]),as.numeric((inputs_prcc[33,4] - inputs_prcc[33,6])/1.96)) #productivity growth
+  
+  #random draws of uniformly distributed variables
+  inputs_prcc[22,4] <- runif(1,as.numeric(inputs_prcc[22,6]),as.numeric(inputs_prcc[22,7])) #cost of treating a resistant infection in animals
+  inputs_prcc[24,4] <- runif(1,as.numeric(inputs_prcc[24,6]),as.numeric(inputs_prcc[24,7])) #intervention cost per animal
+  
+  #random draws of the beta-distributed variables
+  inputs_prcc[5,4] <- rbeta(1,as.numeric(inputs_prcc[5,6]),as.numeric(inputs_prcc[5,7])) #human mortality from resistant infection
+  inputs_prcc[6,4] <- rbeta(1,as.numeric(inputs_prcc[6,6]),as.numeric(inputs_prcc[6,7])) #human mortality from susceptible infection
+  inputs_prcc[15,4] <- rbeta(1,as.numeric(inputs_prcc[15,6]),as.numeric(inputs_prcc[15,7])) #animal probability of resistant infection
+  inputs_prcc[16,4] <- rbeta(1,as.numeric(inputs_prcc[16,6]),as.numeric(inputs_prcc[16,7])) #animal probability of susceptible infection
+  inputs_prcc[19,4] <- rbeta(1,as.numeric(inputs_prcc[19,6]),as.numeric(inputs_prcc[19,7])) #animal mortality from susceptible infection
+  inputs_prcc[20,4] <- rbeta(1,as.numeric(inputs_prcc[20,6]),as.numeric(inputs_prcc[20,7])) #animal mortality from resistant infection
+  inputs_prcc[25,4] <- rbeta(1,as.numeric(inputs_prcc[25,6]),as.numeric(inputs_prcc[25,7])) #intervention reduction in human AMR
+  inputs_prcc[26,4] <- rbeta(1,as.numeric(inputs_prcc[26,6]),as.numeric(inputs_prcc[26,7])) #intervention reduction in animal AMR
+  
+  #randonly draw the discount rate
+  dr <- rtriang(1, a = 0, b = 10, c = 8)
+
+  prcc_df$a_mort[i] <- inputs_prcc[13,4]
+  prcc_df$a_inc[i] <- inputs_prcc[18,4]
+  prcc_df$prod_growth[i] <- inputs_prcc[33,4]
+  prcc_df$a_res_cost[i] <- inputs_prcc[22,4]
+  prcc_df$a_int_cost[i] <- inputs_prcc[24,4]
+  prcc_df$h_res_mort[i] <- inputs_prcc[5,4]
+  prcc_df$h_sus_mort[i] <- inputs_prcc[6,4]
+  prcc_df$a_res_prob[i] <- inputs_prcc[15,4]
+  prcc_df$a_sus_prob[i] <- inputs_prcc[16,4]
+  prcc_df$a_res_mort[i] <- inputs_prcc[19,4]
+  prcc_df$a_sus_mort[i] <- inputs_prcc[20,4]
+  prcc_df$h_amr_fall[i] <- inputs_prcc[25,4]
+  prcc_df$a_amr_fall[i] <- inputs_prcc[26,4]
+  prcc_df$dr[i] <- dr 
+  prcc_df$ICER[i] <- model(inputs_prcc)[1,13]
+  
+  inputs_prcc <- inputs
+  
+  if(i %% 100 == 0){
+    print(i)
+  }
+  
+}
+
+safe <- prcc_df
+
+a_mort <- as.numeric(unlist(safe$a_mort))
+a_inc <- as.numeric(unlist(safe$a_inc))
+prod_growth <- as.numeric(unlist(safe$prod_growth))
+a_res_cost <- as.numeric(unlist(safe$a_res_cost))
+a_int_cost <- as.numeric(unlist(safe$a_int_cost))
+h_res_mort <- as.numeric(unlist(safe$h_res_mort))
+h_sus_mort <- as.numeric(unlist(safe$h_sus_mort))
+a_res_prob <- as.numeric(unlist(safe$a_res_prob))
+a_sus_prob <- as.numeric(unlist(safe$a_sus_prob))
+a_res_mort <- as.numeric(unlist(safe$a_res_mort))
+a_sus_mort <- as.numeric(unlist(safe$a_sus_mort))
+h_amr_fall <- as.numeric(unlist(safe$h_amr_fall))
+a_amr_fall <- as.numeric(unlist(safe$a_amr_fall))
+drr <- as.numeric(unlist(safe$dr))
+ICER <- as.numeric(unlist(safe$ICER))
+
+prcc_dataset <- as.data.frame(cbind(a_mort,a_inc,prod_growth,a_res_cost,a_int_cost,h_res_mort,h_sus_mort,a_res_prob,a_sus_prob,a_res_mort,a_sus_mort,h_amr_fall,a_amr_fall,drr,ICER))
+
+write.csv(prcc_dataset,"C:/Users/tresc/Desktop/AMR-Model/outputs/prcc_data.csv", row.names = F)
+
+#evaluate the monotonicity of the relationships by looking at scatterplots
+
+plot(prcc_dataset$a_mort , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$a_inc, prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$prod_growth , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$a_res_cost , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$a_int_cost , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$h_res_mort , prcc_dataset$ICER) #possible non-monotonicity
+
+plot(prcc_dataset$h_sus_mort , prcc_dataset$ICER) #possible non-monotonicity
+
+plot(prcc_dataset$a_res_prob , prcc_dataset$ICER) #possible non-monotonicity
+
+plot(prcc_dataset$a_sus_prob , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$a_res_mort , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$a_sus_mort , prcc_dataset$ICER) #safe
+
+plot(prcc_dataset$h_amr_fall , prcc_dataset$ICER) #unclear
+
+plot(prcc_dataset$a_amr_fall , prcc_dataset$ICER) #unclear
+
+plot(prcc_dataset$drr , prcc_dataset$ICER) #unclear
+
+id <- seq(from = 1, to = 10000, by = 1)
+
+monotonic_test_dataset <- as.data.frame(cbind(id, prcc_dataset))
+
+#gauge to PRCC
+
+epi.prcc(prcc_dataset, sided.test = 2, conf.level = 0.95)
+#significant values: 5 (animal intervention cost)(+), 7 (human mortality from sus)(-), 8 (animal probability of res)(-), 
+#11 (animal mortality from sus)(-), 12 (fall in human AMR)(-), 13 (fall in animal AMR)(-), 14 (discount rate)(-)
+#some of these don't make sense though --> we saw that a higher discount rate increased the ICER
+
+epi.prcc(prcc_dataset, sided.test = 1, conf.level = 0.95)
+#in the one-sided test, the significant values are:
+#2(-), 5(+), 7(-), 8(-), 11(-), 12(-), 13(-), 14(-)
+#only difference is that income from animal sale is now significant, and negatively related to ICER (makes sense)
+
+#run eFAST to assess relative contributions to variance
