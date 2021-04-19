@@ -13,6 +13,7 @@ library("epiR")
 library("extraDistr")
 library("MonoInc")
 library("pksensi")
+library("sensitivity")
 
 pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
@@ -166,7 +167,7 @@ wb_population[3]
 
 ###### defined parameters across the sectors ######
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
-dr <- 0.035 ## discount rate
+dr <- 0.08 ## discount rate
 wtp <- 2000 ## willingness to pay per QALY gained
 
 ############# model functions
@@ -1042,10 +1043,12 @@ epi.prcc(prcc_dataset, sided.test = 2, conf.level = 0.95)
 #significant values: 5 (animal intervention cost)(+), 7 (human mortality from sus)(-), 8 (animal probability of res)(-), 
 #11 (animal mortality from sus)(-), 12 (fall in human AMR)(-), 13 (fall in animal AMR)(-), 14 (discount rate)(-)
 #some of these don't make sense though --> we saw that a higher discount rate increased the ICER
+#this is probably because PRCC requires a monotonic relationship
 
 epi.prcc(prcc_dataset, sided.test = 1, conf.level = 0.95)
 #in the one-sided test, the significant values are:
 #2(-), 5(+), 7(-), 8(-), 11(-), 12(-), 13(-), 14(-)
 #only difference is that income from animal sale is now significant, and negatively related to ICER (makes sense)
 
-#run eFAST to assess relative contributions to variance
+
+   
