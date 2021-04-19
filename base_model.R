@@ -169,6 +169,7 @@ wb_population[3]
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 dr <- 0.08 ## discount rate
 wtp <- 2000 ## willingness to pay per QALY gained
+scenario <- "HCA"
 
 ############# model functions
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv")
@@ -203,9 +204,15 @@ model <- function(inputs){
   
   
   ###################*****HUMAN MODEL*****###########################
+  #for HCA and FCA, we only care about the losses in productivity, so we set the 
+  #reward for 'well' to be zero. Going into the 'dead' state incurs a productivity
+  #loss equal to the discounted value of future earnings, going into the 'res' or 'sus
+  #states incurs a loss equal to the earnings that would have been made during the 
+  #time in hospital. After 1 period, all people in 'dead' go to 'afterlife', which
+  #has a reward of zero
   
-  state_names <- c("well", "res","sus","dead") ## the compartments
-  transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s")  ## the transition probabilities
+  state_names <- c("well", "res","sus","dead", "afterlife") ## the compartments
+  transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s", "dead_aft")  ## the transition probabilities
   parameter_names <- c(state_names, transition_names)
   
   ## initial state vector (population starting in well)
@@ -225,6 +232,7 @@ model <- function(inputs){
   m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]), n.t)
   m_param[ , "birth"] <- birthrate[1:n.t] ##set to be predicted net births
   m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births
+  m_param[ , "dead_aft"] <- rep(1, n.t) #all those who die go to the afterlife
   
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
@@ -246,6 +254,8 @@ model <- function(inputs){
         (m_param[i-1,"mort_w"]*m_param[i-1,"well"])
       ## note that this is the incidence of death due to how we then multiply with QALY loss but 
       # if change that should also add in + m_param[i-1,"dead"] 
+      
+      m_param[i, "afterlife"] <- m_param[i-1, "afterlife"] + m_param[i-1, "dead"] #just keeps growing
     }
     return(m_param)
   }
@@ -260,7 +270,7 @@ model <- function(inputs){
   c_r <- human[parameter=="r_cost",value]
   c_s <- human[parameter=="s_cost",value]
   
-  cost_i <- c(0,c_r,c_s,0)
+  cost_i <- c(0,c_r,c_s,0, 0)
   
   ## start at cycle 1 so you do not multiply initial state vector 
   m_cost[2, 1:length(state_names)] <- cost_i
@@ -281,10 +291,10 @@ model <- function(inputs){
   r_r <- human[parameter=="hrqol_res",value] ## same but adjusted for longer LoS
   r_d <- human[parameter=="hrqol_death",value] 
   
-  rwd_i <- c(1,r_r,r_s,r_d) 
+  rwd_i <- c(1,r_r,r_s,r_d, 0) 
   
   ##############################################################################
-  #have changed health state rewards to be 1, 0.98 0.975, 0 
+  #have changed health state rewards to be 1, 0.98 0.975, 0, 0 
   ##############################################################################
   
   ## start at cycle 1 so you do not multiply initial state vector 
@@ -298,8 +308,12 @@ model <- function(inputs){
   }
   
   #### Productivity Costs ###########
-  #all zero at present since we are just counting the benefit of hours worked - the effective productivity 'cost'
-  #will actually be the difference in rewards
+  #for HCA and FCA, we only care about the losses in productivity, so we set the 
+  #reward for 'well' to be zero. Going into the 'dead' state incurs a productivity
+  #loss equal to the discounted value of future earnings, going into the 'res' or 'sus
+  #states incurs a loss equal to the earnings that would have been made during the 
+  #time in hospital. After 1 period, all people in 'dead' go to 'afterlife', which
+  #has a reward of zero
   
   m_cost_prod <- matrix(rep(0),nrow = n.t, ncol = length(parameter_names))
   colnames(m_cost_prod) <- parameter_names
@@ -308,7 +322,7 @@ model <- function(inputs){
   c_r_prod <- 0
   c_s_prod <- 0
   
-  cost_i_prod <- c(0,0,0,0)
+  cost_i_prod <- rep(0,(length(state_names)))
   
   ## start at cycle 1 so you do not multiply initial state vector
   m_cost_prod[2,1:length(state_names)] <- cost_i_prod
@@ -322,20 +336,39 @@ model <- function(inputs){
   
   #### Productivity Rewards #########
   
+  #calculate the discounted value of future work
+  #
+  
   m_rwd_prod <- matrix(rep(0), nrow = n.t, ncol = length(parameter_names))
   colnames(m_rwd_prod) <- parameter_names
   rownames(m_rwd_prod) <- paste("cycle", 0:(n.t-1), sep = "")
   
-  r_r_prod <- human[parameter=="prod",value]*0.923504449 #accounting for longer stay if res
+  r_r_prod <- -1*(human[parameter=="prod",value]+human[parameter=="unpaid_prod",value])*(1-0.923504449) #accounting for longer stay if res
   
-  r_s_prod <- human[parameter=="prod",value]*0.94
+  r_s_prod <- -1*(human[parameter=="prod",value]+human[parameter=="unpaid_prod",value])*(1-0.94)
   
-  r_d_prod <- 0
+  r_w_prod <- 0
   
-  r_w_prod <- human[parameter=="prod",value]
+  r_aft_prod <- 0
+  
+  yearly_prod <- (human[parameter=="prod",value] + human[parameter=="unpaid_prod", value])
+  pv_fut_prod <- c(rep(0,34)) #expected remaining working years
+  for (i in 1:34){
+    pv_fut_prod[i] <- yearly_prod * (1-dr)^(i-1)
+  }
+  pv_life_prod <- sum(pv_fut_prod)
+  
+  if(scenario == "HCA"){
+    r_d_prod <- -1 * pv_life_prod
+  } else if(scenario == "FCA"){
+    r_d_prod <- -0.5 * yearly_prod
+  } else{
+    paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING PRODUCTIVITY OUTCOMES")
+  }
+  
   
   #multiply the initial productivity rewards by the portion of people who are working
-  rwd_i_prod <- c(portion_working[1]*r_w_prod, portion_working[1]*r_r_prod, portion_working[1]*r_s_prod, portion_working[1]*r_d_prod)
+  rwd_i_prod <- c(portion_working[1]*r_w_prod, portion_working[1]*r_r_prod, portion_working[1]*r_s_prod, portion_working[1]*r_d_prod, r_aft_prod)
   
   ## start at cycle 1 so you do not multiply initial state vector
   m_rwd_prod[2,1:length(state_names)] <- rwd_i_prod 
@@ -350,7 +383,8 @@ model <- function(inputs){
     }
   }
   
-  #now we multiply the productivity rewards across all states and time steps by the portion of people working
+  #now we multiply the productivity rewards across all states and time steps
+  #(apart from initial, which we already did) by the portion of people working
   for (j in 1:length(state_names)) {
     for (i in 3:(n.t)) {
       m_rwd_prod[i,j] <- m_rwd_prod[i,j]*portion_working[i]
@@ -563,8 +597,8 @@ model <- function(inputs){
   
   total_results_prod[1,2] <- results_base_h[,2]
   total_results_prod[2,2] <- results_interv_h[,2]
-  total_results_prod[1,1] <- results_base_prod[,2]
-  total_results_prod[2,1] <- results_interv_prod[,2]
+  total_results_prod[1,1] <- results_base_prod[,2]   #will be negative
+  total_results_prod[2,1] <- results_interv_prod[,2] #will be negative but hopefully closer to zero
   
   #### HC 
   incr_cost <- (results_interv_h[1,1] - results_base_h[1,1])
@@ -572,19 +606,16 @@ model <- function(inputs){
   icer <- incr_cost/incr_benefit
   NMB_H <- (incr_benefit*wtp)-(incr_cost)  # per person in the population
   
-  
-  
   #############################################################################
   #because there technically aren't any costs for the productivity side,
   #we use the negative productivity gain from base to intervention (a productivity gain would incur a negative 'cost')
   #############################################################################
   
-  
   ### Productivity
-  incr_cost_prod <- total_results_prod[1,1] - total_results_prod[2,1]
-  incr_benefit_prod <- total_results_prod[2,2] - total_results_prod[1,2]
-  icer_prod <- incr_cost_prod/incr_benefit_prod
-  NMB_prod <- total_results_prod[2,1] - total_results_prod[1,1]
+  incr_cost_prod <- total_results_prod[1,1] - total_results_prod[2,1] #hopefully negative
+  incr_benefit_prod <- total_results_prod[2,2] - total_results_prod[1,2] #hopefully positive
+  icer_prod <- incr_cost_prod/incr_benefit_prod #hopefully negative, if intervention improves productivity and saves QALYs
+  NMB_prod <- total_results_prod[2,1] - total_results_prod[1,1] #hopefully positive
   
   ## Farm level
   incr_cost_a <- (results_interv_a[1,1] - results_base_a[1,1])
