@@ -53,3 +53,4 @@ pig_1,u_RA,reduction in resistance in pigs from reduction in antibiotic usage in
 pig_1,n_farms,number of farms in the population of interest,301562,NA,,,,"gross output from https://www.nationmaster.com/nmx/timeseries/vietnam-pork-production, pig weight from Coyne et al., 2020, no. of pigs per farm from NNNNNT et al., 2016"
 pig_1,n_animals,average herd size,108,normal,47,169,"from NNNNNT et al., 2016",
 pig_1,p_mort_change,change in animal mortality following the intervention, ,,,,,
+/,,,,,,,,
