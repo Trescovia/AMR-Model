@@ -95,7 +95,7 @@ plot(portion_working)
 #population and working population from WB projections
 
 ##working population
-wb_working_pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMAViet Nam Working Population WB.csv")
+wb_working_pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Viet Nam Working Population WB.csv")
 
 wb_working_pop <- ts(wb_working_pop$Working.Population, start = 1960, frequency = 1)
 
@@ -129,7 +129,7 @@ working_population ## this one for working population
 working_population[3]
 
 ##total population
-wb_pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMAViet Nam Population WB.csv")
+wb_pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Viet Nam Population WB.csv")
 
 wb_pop <- ts(wb_pop$Population, start = 1960, frequency = 1)
 
@@ -286,12 +286,17 @@ model <- function(inputs){
   colnames(m_rwd) <- parameter_names
   rownames(m_rwd) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
+  pv_fut_life <- c(rep(0,46)) #expected remaining life years
+  for (i in 1:46){
+    pv_fut_life[i] <- human[parameter=="background_qol",value] * (1-dr)^(i-1)
+  }
+  pv_life <- sum(pv_fut_life)
   
-  r_s <- human[parameter=="hrqol_ill",value] ## disability weight of being in hospital with BSI
-  r_r <- human[parameter=="hrqol_res",value] ## same but adjusted for longer LoS
-  r_d <- human[parameter=="hrqol_death",value] 
+  r_s <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_ill",value]-1) ## QoL lost from time in hospital
+  r_r <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_res",value]-1) ## same but adjusted for longer LoS
+  r_d <- -1 * pv_life #discounted QoL loss from death
   
-  rwd_i <- c(1,r_r,r_s,r_d, 0) 
+  rwd_i <- c(0,r_r,r_s,r_d, 0) 
   
   ##############################################################################
   #have changed health state rewards to be 1, 0.98 0.975, 0, 0 

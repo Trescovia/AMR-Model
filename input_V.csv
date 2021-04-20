@@ -35,3 +35,4 @@ human_0,prod_growth,year-on-year per-worker productivity growth,0.0577,normal,0.
 human_0,discount_rate,same for health outcomes and costs,0.094,uniform,0.03,0.12,
 animal_0,amu_a_growth,annual growth in animal antimicrobial use,0.0483,,,,from van Boeckel
 human_0,unpaid_prod,"the annual value of unpaid labour per adult, international dollars",2555,,,,
+human_0,background_qol,background quality of life for those in 'well',1,,,,
