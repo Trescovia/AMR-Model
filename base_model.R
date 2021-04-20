@@ -918,7 +918,9 @@ ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
   theme_bw() +
   theme(axis.text = element_text(size = 15))
 
-#exploring discount rates
+################################################################################
+############################exploring discount rates############################
+################################################################################
 model(inputs)
 dr <- 0.094
 model(inputs) #becomes significantly less cost-effective with a higher discount rate
@@ -942,7 +944,37 @@ ggplot(dr_df, aes(x=dr_vector, y=dr_icer)) +
   geom_vline(xintercept = 0.03, linetype = "dotted")+
   geom_vline(xintercept = 0.066, lty = "dashed")+
   geom_vline(xintercept = 0.094)+
-  ggtitle("Macro-Level ICER at Different Levels of the Discount Rate")
+  ggtitle("Macro-Level ICER at Different Levels of the Discount Rate")+
+  labs(title = "Macro-Level ICER at Different Levels of the Discount Rate", x = "Intertemporal Discount Rate", y = "Macro-Level ICER")
+
+################################################################################
+############################exploring farm costs################################
+################################################################################
+
+cost_vector <- as.vector(seq(from = -0.05, to = 0.15, by = 0.0001))
+cost_icer <- as.vector(rep(0,2001))
+
+inputs_cost <- inputs 
+
+for(i in 1:1201){
+  inputs_cost[24,4] <- cost_vector[i]
+  cost_icer[i] <- as.data.frame(model(inputs_cost))[1,13]
+  inputs_cost <- inputs 
+}
+
+cost_df <- as.data.frame(cbind(cost_vector, cost_icer))
+colnames(cost_df) <- c("Cost per Chicken", "Macro-Level ICER")
+
+plot(cost_df$`Cost per Chicken`, cost_df$`Macro-Level ICER`)
+
+ggplot(cost_df, aes(x=cost_vector, y=cost_icer)) +
+  geom_point()+
+  geom_vline(xintercept = 0, linetype = "dashed", lwd = 1, col = "red")+
+  #geom_vline(xintercept = 0.02173, linetype = "dashed", lwd = 1, col = "blue")+
+  geom_vline(xintercept = 0.022205, linetype = "dashed", lwd = 1, col = "blue")+
+  labs(title = "Macro-Level ICER at Different Levels of Intervention Cost", 
+       x = "Intervention Cost per Chicken", y = "Macro-Level ICER", 
+       subtitle = "Red: ICER at Zero Net Cost, Blue: ICER at Cost-Effective Threshold (0.022205 USD)")
 
 ################################################################################
 ################################################################################
