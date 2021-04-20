@@ -1,0 +1,26 @@
+#---------------------------------------- 
+# sim.in
+# (Created by generate_infile)
+#----------------------------------------
+
+Integrate (Lsodes, 1e-06, 1e-06 , 1);
+
+SetPoints (
+"simmc.out", 
+"setpts.out",
+0, 
+);
+
+
+#---------------------------------------- 
+# Simulation scenario
+#----------------------------------------
+
+Simulation { 
+
+;
+;
+
+Print (, );
+Print (, );
+} END.
