@@ -168,7 +168,7 @@ wb_population[3]
 ###### defined parameters across the sectors ######
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 dr <- 0.08 ## discount rate
-wtp <- 2000 ## willingness to pay per QALY gained
+wtp <- 2365 ## willingness to pay per QALY gained
 scenario <- "HCA" #must be "HCA" or "FCA"
 
 ############# model functions
