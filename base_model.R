@@ -170,6 +170,7 @@ n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 dr <- 0.08 ## discount rate
 wtp <- 2365 ## willingness to pay per QALY gained
 scenario <- "HCA" #must be "HCA" or "FCA"
+scenario_transmission <- "Tang" #for now, must be "Tang" or "Booton"
 
 ############# model functions
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv")
@@ -658,9 +659,17 @@ model <- function(inputs){
   ### reduction in incidence of drug resistant infections
   ### humans
   m_param2 <- m_param ## parameter matrix for scenario 2
+  
+  if(scenario_transmission == "Tang"){
+    m_param2[ , "r"] <- rep(human[parameter=="well_r",value]-(human[parameter=="well_r",value]*intervention[parameter=="u_RH",value]),
+                            n.t)
+  } else if(scenario_transmission == "Booton"){
+    m_param2[ , "r"] <- rep(human[parameter=="well_r",value]-(human[parameter=="well_r",value]*intervention[parameter=="u_RH_Booton",value]),
+                            n.t)
+  } else{
+    paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON HUMAN AMR")
+  }
 
-  m_param2[ , "r"] <- rep(human[parameter=="well_r",value]-(human[parameter=="well_r",value]*intervention[parameter=="u_RH",value]),
-                          n.t)
   ## this is assuming a reduction in drug resistant infections
   ## if you want to then just change the proportion that are resistant
   ## but keep total infection numbers constant
@@ -674,8 +683,18 @@ model <- function(inputs){
 
   ## animals
   m_param_a2 <- m_param_a_base
-  m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
-                            n.t)
+  
+  
+  if(scenario_transmission == "Tang"){
+    m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
+                              n.t)
+  } else if(scenario_transmission == "Booton"){
+    m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA_Booton",value]),
+                              n.t)
+  } else{
+    paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON ANIMAL AMR")
+  }
+  
   m_param_a2[ , 1:length(state_names_a)] <- 0
   m_param_a2[1, 1:length(state_names_a)] <- state_i_a
 
@@ -683,18 +702,36 @@ model <- function(inputs){
   ### !!! need to check this because giving minus values
 
   ### costs and rewards are the same for healthcare system
-  ## rewards are the same for farms
+  ## rewards will change due to productivity changes' effect on income per animal sold
   # costs change for each well add a cost of intervention
-
+  
+  #rewards
+  m_rwd_a2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
+  colnames(m_rwd_a2) <- parameter_names_a
+  rownames(m_rwd_a2) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  
+  r_sold_2 <- (animal[parameter=="i_animal",value])*(1+intervention[parameter=="chicken_income_effect", value]) 
+  rwd_i_a2 <- c(0,0,0,0,r_sold_2)
+  
+  ## start at cycle 1 so you do not multiply initial state vector 
+  m_rwd_a2[2, 1:length(state_names_a)] <- rwd_i_a2
+  
+  for (j in 1:length(state_names_a)) {
+    for (i in 3:(n.t)){
+      m_rwd_a2[i,j] <- f_di(m_rwd_a2[i-1,j],dr)
+    }  
+  }
+  
+  #costs
   m_cost_a2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
   colnames(m_cost_a) <- parameter_names_a
   rownames(m_cost_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
 
   c_s <- animal[parameter=="s_cost",value]
-  c_r <- c_s+(c_s*animal[parameter=="r_cost",value])
-  c_interv <- intervention[parameter=="int_cost_per",value]
+  c_r <- animal[parameter=="r_cost",value] #removed double-paying 
+  #c_interv <- intervention[parameter=="int_cost_per",value] #commented out as the farm-level economic effect now manifests itself in the rewards
 
-  cost_i_a2 <- c(c_w + c_interv,c_w + c_r,c_w + c_s,0,0) #changed it so you still pay upkeep on animals who are treated or infected
+  cost_i_a2 <- c(c_w, c_w + c_r,c_w + c_s,0,0) #changed it so you still pay upkeep on animals who are treated or infected
 
   ## start at cycle 1 so you do not multiply initial state vector
   m_cost_a2[2, 1:length(state_names_a)] <- cost_i_a2
@@ -737,7 +774,7 @@ model <- function(inputs){
   results_base_h <- f_expvalue(m_param,m_cost,m_rwd)
   results_base_a <- f_expvalue(m_param_a,m_cost_a,m_rwd_a)
   results_interv_h <- f_expvalue(m_param2,m_cost,m_rwd)
-  results_interv_a <- f_expvalue(m_param_a2,m_cost_a2,m_rwd_a)
+  results_interv_a <- f_expvalue(m_param_a2,m_cost_a2,m_rwd_a2)
   #results_base_p <- f_expvalue(m_param_p,m_cost_p,m_rwd_p)
   #results_interv_p <- f_expvalue(m_param_p2,m_cost_p2,m_rwd_p)
   
@@ -800,7 +837,9 @@ model <- function(inputs){
   NMB_A_all <- NMB_A*intervention[parameter=="n_farms",value]
   # NMB_A_all <- (NMB_A*intervention[parameter=="n_farms",value]) + (NMB_p*pig[parameter=="n_farms",value])
   
-  incr_cost_macro <- incr_cost_prod - NMB_A_all + incr_cost
+  implementation_cost <- intervention[parameter=="admin_cost", value]
+  
+  incr_cost_macro <- implementation_cost + incr_cost_prod - NMB_A_all + incr_cost
   
   icer_macro <- incr_cost_macro / incr_benefit
   
@@ -813,7 +852,7 @@ model <- function(inputs){
                         #incr_benefit_p=incr_benefit_p, incr_cost_p=incr_cost_p, CBR_p=CBR_p, NMB_A_p=NMB_A_p, NMB_A_all=NMB_A_all
                         icer=icer, CBR = CBR, NMB_H=NMB_H, NMB_A=NMB_A, icer_prod = icer_prod, 
                         NMB_prod = NMB_prod, net_monetary_gain_macro = net_monetary_gain_macro,
-                        NMB_macro = NMB_macro, icer_macro = icer_macro)
+                        NMB_macro = NMB_macro, icer_macro = icer_macro, implementation_cost = implementation_cost)
   outputs
   
   return(outputs)
@@ -891,160 +930,160 @@ CEAC <- plot(density,
 abline(v = c(200,3000), col = c("blue", "red"), lty = c(2,2), lwd = c(2,2)) 
 
 #tornado plot
-#get base case ICER
-tornado_base <- as.data.frame(model(inputs))[1,13]
+#get base case NMB
+tornado_base <- as.data.frame(model(inputs))[1,12]
 
 #prod growth
 inputstornado <- inputs 
 inputstornado[33,4] <- inputs[33,6]
-prod_growth_low <- as.data.frame(model(inputstornado))[1,13]
+prod_growth_low <- as.data.frame(model(inputstornado))[1,12]
 prod_growth_low <- prod_growth_low - tornado_base
 inputstornado[33,4] <- inputs[33,7]
-prod_growth_high <- as.data.frame(model(inputstornado))[1,13]
+prod_growth_high <- as.data.frame(model(inputstornado))[1,12]
 prod_growth_high <- prod_growth_high - tornado_base
 
 #reduction in animal resistance
 inputstornado <- inputs
 inputstornado[26,4] <- inputs[26,6]
-u_RA_low <- as.data.frame(model(inputstornado))[1,13]
+u_RA_low <- as.data.frame(model(inputstornado))[1,12]
 u_RA_low <- u_RA_low - tornado_base
 inputstornado[26,4] <- inputs[26,7]
-u_RA_high <- as.data.frame(model(inputstornado))[1,13]
+u_RA_high <- as.data.frame(model(inputstornado))[1,12]
 u_RA_high <- u_RA_high - tornado_base
 
 #reduction in human resistance
 inputstornado <- inputs
 inputstornado[25,4] <- inputs[25,6]
-u_RH_low <- as.data.frame(model(inputstornado))[1,13]
+u_RH_low <- as.data.frame(model(inputstornado))[1,12]
 u_RH_low <- u_RH_low - tornado_base
 inputstornado[25,4] <- inputs[25,7]
-u_RH_high <- as.data.frame(model(inputstornado))[1,13]
+u_RH_high <- as.data.frame(model(inputstornado))[1,12]
 u_RH_high <- u_RH_high - tornado_base
 
 #intervention cost per chicken
 inputstornado <- inputs
 inputstornado[24,4] <- inputs[24,6]
-int_cost_low <- as.data.frame(model(inputstornado))[1,13]
+int_cost_low <- as.data.frame(model(inputstornado))[1,12]
 int_cost_low <- int_cost_low - tornado_base
 inputstornado[24,4] <- inputs[24,7]
-int_cost_high <- as.data.frame(model(inputstornado))[1,13]
+int_cost_high <- as.data.frame(model(inputstornado))[1,12]
 int_cost_high <- int_cost_high - tornado_base
 
 #cost of treating a resistant infection in animals
 inputstornado <- inputs
 inputstornado[22,4] <- inputs[22,6]
-res_treat_a_low <- as.data.frame(model(inputstornado))[1,13]
+res_treat_a_low <- as.data.frame(model(inputstornado))[1,12]
 res_treat_a_low <- res_treat_a_low - tornado_base
 inputstornado[22,4] <- inputs[22,7]
-res_treat_a_high <- as.data.frame(model(inputstornado))[1,13]
+res_treat_a_high <- as.data.frame(model(inputstornado))[1,12]
 res_treat_a_high <- res_treat_a_high - tornado_base
 
 #cost of treating a susceptible infection in animals
 inputstornado <- inputs
 inputstornado[21,4] <- inputs[21,6]
-sus_treat_a_low <- as.data.frame(model(inputstornado))[1,13]
+sus_treat_a_low <- as.data.frame(model(inputstornado))[1,12]
 sus_treat_a_low <- sus_treat_a_low - tornado_base
 inputstornado[21,4] <- inputs[21,7]
-sus_treat_a_high <- as.data.frame(model(inputstornado))[1,13]
+sus_treat_a_high <- as.data.frame(model(inputstornado))[1,12]
 sus_treat_a_high <- sus_treat_a_high - tornado_base
 
 #animal mortality from resistant infection
 inputstornado <- inputs
 inputstornado[20,4] <- inputs[20,6]
-res_mort_a_low <- as.data.frame(model(inputstornado))[1,13]
+res_mort_a_low <- as.data.frame(model(inputstornado))[1,12]
 res_mort_a_low <- res_mort_a_low - tornado_base
 inputstornado[20,4] <- inputs[20,7]
-res_mort_a_high <- as.data.frame(model(inputstornado))[1,13] 
+res_mort_a_high <- as.data.frame(model(inputstornado))[1,12] 
 res_mort_a_high <- res_mort_a_high - tornado_base
 
 #animal mortality from susceptible infection
 inputstornado <- inputs
 inputstornado[19,4] <- inputs[19,6]
-sus_mort_a_low <- as.data.frame(model(inputstornado))[1,13]
+sus_mort_a_low <- as.data.frame(model(inputstornado))[1,12]
 sus_mort_a_low <- sus_mort_a_low - tornado_base
 inputstornado[19,4] <- inputs[19,7]
-sus_mort_a_high <- as.data.frame(model(inputstornado))[1,13] 
+sus_mort_a_high <- as.data.frame(model(inputstornado))[1,12] 
 sus_mort_a_high <- sus_mort_a_high - tornado_base
 
 #income per chicken sold
 inputstornado <- inputs
 inputstornado[18,4] <- inputs[18,6]
-income_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+income_chicken_low <- as.data.frame(model(inputstornado))[1,12]
 income_chicken_low <- income_chicken_low - tornado_base
 inputstornado[18,4] <- inputs[18,7]
-income_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+income_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
 income_chicken_high <- income_chicken_high - tornado_base
 
 #cost (financial, not emotional) of raising a chicken
 inputstornado <- inputs
 inputstornado[17,4] <- inputs[17,6]
-upkeep_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+upkeep_chicken_low <- as.data.frame(model(inputstornado))[1,12]
 upkeep_chicken_low <- upkeep_chicken_low - tornado_base
 inputstornado[17,4] <- inputs[17,7]
-upkeep_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+upkeep_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
 upkeep_chicken_high <- upkeep_chicken_high - tornado_base
 
 #probability of an animal getting a susceptible infection
 inputstornado <- inputs
 inputstornado[16,4] <- inputs[16,6]
-sus_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+sus_chicken_low <- as.data.frame(model(inputstornado))[1,12]
 sus_chicken_low <- sus_chicken_low - tornado_base
 inputstornado[16,4] <- inputs[16,7]
-sus_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+sus_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
 sus_chicken_high <- sus_chicken_high - tornado_base
 
 #probability of an animal getting a resistant infection
 inputstornado <- inputs
 inputstornado[15,4] <- inputs[15,6]
-res_chicken_low <- as.data.frame(model(inputstornado))[1,13]
+res_chicken_low <- as.data.frame(model(inputstornado))[1,12]
 res_chicken_low <- res_chicken_low - tornado_base
 inputstornado[15,4] <- inputs[15,7]
-res_chicken_high <- as.data.frame(model(inputstornado))[1,13] 
+res_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
 res_chicken_high <- res_chicken_high - tornado_base
 
 #chicken background mortality
 inputstornado <- inputs
 inputstornado[13,4] <- inputs[13,6]
-chicken_mort_low <- as.data.frame(model(inputstornado))[1,13]
+chicken_mort_low <- as.data.frame(model(inputstornado))[1,12]
 chicken_mort_low <- chicken_mort_low - tornado_base
 inputstornado[13,4] <- inputs[13,7]
-chicken_mort_high <- as.data.frame(model(inputstornado))[1,13] 
+chicken_mort_high <- as.data.frame(model(inputstornado))[1,12] 
 chicken_mort_high <- chicken_mort_high - tornado_base
 
 #hospital cost of treating a resistant infection in humans
 inputstornado <- inputs
 inputstornado[8,4] <- 0.5 * inputs[8,4]
-res_treat_low <- as.data.frame(model(inputstornado))[1,13]
+res_treat_low <- as.data.frame(model(inputstornado))[1,12]
 res_treat_low <- res_treat_low - tornado_base
 inputstornado[8,4] <- 1.5 * inputs[8,4]
-res_treat_high <- as.data.frame(model(inputstornado))[1,13] 
+res_treat_high <- as.data.frame(model(inputstornado))[1,12] 
 res_treat_high <- res_treat_high - tornado_base
 
 #hospital cost of treating a susceptible infection in humans
 inputstornado <- inputs
 inputstornado[7,4] <- 0.5 * inputs[7,4]
-sus_treat_low <- as.data.frame(model(inputstornado))[1,13]
+sus_treat_low <- as.data.frame(model(inputstornado))[1,12]
 sus_treat_low <- sus_treat_low - tornado_base
 inputstornado[7,4] <- 1.5 * inputs[7,4]
-sus_treat_high <- as.data.frame(model(inputstornado))[1,13] 
+sus_treat_high <- as.data.frame(model(inputstornado))[1,12] 
 sus_treat_high <- sus_treat_high - tornado_base
 
 #mortality of resistant cases
 inputstornado <- inputs
 inputstornado[6,4] <- 0.5 * inputs[6,4]
-res_mort_low <- as.data.frame(model(inputstornado))[1,13]
+res_mort_low <- as.data.frame(model(inputstornado))[1,12]
 res_mort_low <- res_mort_low - tornado_base
 inputstornado[6,4] <- 1.5 * inputs[6,4]
-res_mort_high <- as.data.frame(model(inputstornado))[1,13]
+res_mort_high <- as.data.frame(model(inputstornado))[1,12]
 res_mort_high <- res_mort_high - tornado_base
 
 #mortality of susceptible cases
 inputstornado <- inputs
 inputstornado[5,4] <- 0.5 * inputs[5,4]
-sus_mort_low <- as.data.frame(model(inputstornado))[1,13]
+sus_mort_low <- as.data.frame(model(inputstornado))[1,12]
 sus_mort_low <- sus_mort_low - tornado_base
 inputstornado[5,4] <- 1.5 * inputs[5,4]
-sus_mort_high <- as.data.frame(model(inputstornado))[1,13]
+sus_mort_high <- as.data.frame(model(inputstornado))[1,12]
 sus_mort_high <- sus_mort_high - tornado_base
 
 tornado <- data.frame(variable = c("productivity growth",
@@ -1076,7 +1115,7 @@ ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
   geom_linerange(size = 10) +
   coord_flip() +
   xlab("") +
-  ggtitle("Change in Macro-Level ICER along Range of Each Parameter")+
+  ggtitle("Change in Macro-Level Net Monetary Benefit along Range of Each Parameter")+
   geom_hline(yintercept = 0, linetype = "dotted") +
   theme_bw() +
   theme(axis.text = element_text(size = 15))
@@ -1090,25 +1129,25 @@ model(inputs) #becomes significantly less cost-effective with a higher discount 
 dr <- 0.035
 
 dr_vector <- as.vector(seq(from = 0, to = 0.12, by = 0.0001))
-dr_icer <- as.vector(rep(0,1201))
+dr_NMB <- as.vector(rep(0,1201))
 
 for(i in 1:1201){
   dr <- dr_vector[i]
-  dr_icer[i] <- as.data.frame(model(inputs))[1,13]
+  dr_NMB[i] <- as.data.frame(model(inputs))[1,12]
 }
 
-dr_df <- as.data.frame(cbind(dr_vector, dr_icer))
-colnames(dr_df) <- c("Discount Rate", "Macro-Level ICER")
+dr_df <- as.data.frame(cbind(dr_vector, dr_NMB))
+colnames(dr_df) <- c("Discount Rate", "Macro-Level NMB")
 
-plot(dr_df$`Discount Rate`, dr_df$`Macro-Level ICER`)
+plot(dr_df$`Discount Rate`, dr_df$`Macro-Level NMB`)
 
-ggplot(dr_df, aes(x=dr_vector, y=dr_icer)) +
+ggplot(dr_df, aes(x=dr_vector, y=dr_NMB)) +
   geom_point()+
   geom_vline(xintercept = 0.03, linetype = "dotted")+
   geom_vline(xintercept = 0.066, lty = "dashed")+
   geom_vline(xintercept = 0.094)+
-  ggtitle("Macro-Level ICER at Different Levels of the Discount Rate")+
-  labs(title = "Macro-Level ICER at Different Levels of the Discount Rate", x = "Intertemporal Discount Rate", y = "Macro-Level ICER")
+  ggtitle("Macro-Level NMB at Different Levels of the Discount Rate")+
+  labs(title = "Macro-Level NMB at Different Levels of the Discount Rate", x = "Intertemporal Discount Rate", y = "Macro-Level NMB")
 
 ################################################################################
 ############################exploring farm costs################################
@@ -1121,23 +1160,23 @@ inputs_cost <- inputs
 
 for(i in 1:1201){
   inputs_cost[24,4] <- cost_vector[i]
-  cost_icer[i] <- as.data.frame(model(inputs_cost))[1,13]
+  cost_NMB[i] <- as.data.frame(model(inputs_cost))[1,12]
   inputs_cost <- inputs 
 }
 
-cost_df <- as.data.frame(cbind(cost_vector, cost_icer))
-colnames(cost_df) <- c("Cost per Chicken", "Macro-Level ICER")
+cost_df <- as.data.frame(cbind(cost_vector, cost_NMB))
+colnames(cost_df) <- c("Cost per Chicken", "Macro-Level NMB")
 
-plot(cost_df$`Cost per Chicken`, cost_df$`Macro-Level ICER`)
+plot(cost_df$`Cost per Chicken`, cost_df$`Macro-Level NMB`)
 
-ggplot(cost_df, aes(x=cost_vector, y=cost_icer)) +
+ggplot(cost_df, aes(x=cost_vector, y=cost_NMB)) +
   geom_point()+
   geom_vline(xintercept = 0, linetype = "dashed", lwd = 1, col = "red")+
   #geom_vline(xintercept = 0.02173, linetype = "dashed", lwd = 1, col = "blue")+
   geom_vline(xintercept = 0.022205, linetype = "dashed", lwd = 1, col = "blue")+
-  labs(title = "Macro-Level ICER at Different Levels of Intervention Cost", 
-       x = "Intervention Cost per Chicken", y = "Macro-Level ICER", 
-       subtitle = "Red: ICER at Zero Net Cost, Blue: ICER at Cost-Effective Threshold (0.022205 USD)")
+  labs(title = "Macro-Level NMB at Different Levels of Intervention Cost", 
+       x = "Intervention Cost per Chicken", y = "Macro-Level NMB", 
+       subtitle = "Red: NMB at Zero Net Cost, Blue: NMB at Cost-Effective Threshold (0.022205 USD)")
 
 ################################################################################
 ################################################################################
@@ -1160,7 +1199,7 @@ prcc_df$a_sus_mort <- rep(0,10000)
 prcc_df$h_amr_fall <- rep(0,10000)
 prcc_df$a_amr_fall <- rep(0,10000)
 prcc_df$dr <- rep(0,10000)
-prcc_df$ICER <- rep(0,10000)
+prcc_df$NMB <- rep(0,10000)
 
 inputs_prcc <- inputs
 
@@ -1202,7 +1241,7 @@ for(i in 1:10000){
   prcc_df$h_amr_fall[i] <- inputs_prcc[25,4]
   prcc_df$a_amr_fall[i] <- inputs_prcc[26,4]
   prcc_df$dr[i] <- dr 
-  prcc_df$ICER[i] <- model(inputs_prcc)[1,13]
+  prcc_df$NMB[i] <- model(inputs_prcc)[1,12]
   
   inputs_prcc <- inputs
   
@@ -1228,41 +1267,41 @@ a_sus_mort <- as.numeric(unlist(safe$a_sus_mort))
 h_amr_fall <- as.numeric(unlist(safe$h_amr_fall))
 a_amr_fall <- as.numeric(unlist(safe$a_amr_fall))
 drr <- as.numeric(unlist(safe$dr))
-ICER <- as.numeric(unlist(safe$ICER))
+NMB <- as.numeric(unlist(safe$NMB))
 
-prcc_dataset <- as.data.frame(cbind(a_mort,a_inc,prod_growth,a_res_cost,a_int_cost,h_res_mort,h_sus_mort,a_res_prob,a_sus_prob,a_res_mort,a_sus_mort,h_amr_fall,a_amr_fall,drr,ICER))
+prcc_dataset <- as.data.frame(cbind(a_mort,a_inc,prod_growth,a_res_cost,a_int_cost,h_res_mort,h_sus_mort,a_res_prob,a_sus_prob,a_res_mort,a_sus_mort,h_amr_fall,a_amr_fall,drr,NMB))
 
 write.csv(prcc_dataset,"C:/Users/tresc/Desktop/AMR-Model/outputs/prcc_data.csv", row.names = F)
 
 #evaluate the monotonicity of the relationships by looking at scatterplots
 
-plot(prcc_dataset$a_mort , prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_mort , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$a_inc, prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_inc, prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$prod_growth , prcc_dataset$ICER) #safe
+plot(prcc_dataset$prod_growth , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$a_res_cost , prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_res_cost , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$a_int_cost , prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_int_cost , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$h_res_mort , prcc_dataset$ICER) #possible non-monotonicity
+plot(prcc_dataset$h_res_mort , prcc_dataset$NMB) #possible non-monotonicity
 
-plot(prcc_dataset$h_sus_mort , prcc_dataset$ICER) #possible non-monotonicity
+plot(prcc_dataset$h_sus_mort , prcc_dataset$NMB) #possible non-monotonicity
 
-plot(prcc_dataset$a_res_prob , prcc_dataset$ICER) #possible non-monotonicity
+plot(prcc_dataset$a_res_prob , prcc_dataset$NMB) #possible non-monotonicity
 
-plot(prcc_dataset$a_sus_prob , prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_sus_prob , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$a_res_mort , prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_res_mort , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$a_sus_mort , prcc_dataset$ICER) #safe
+plot(prcc_dataset$a_sus_mort , prcc_dataset$NMB) #safe
 
-plot(prcc_dataset$h_amr_fall , prcc_dataset$ICER) #unclear
+plot(prcc_dataset$h_amr_fall , prcc_dataset$NMB) #unclear
 
-plot(prcc_dataset$a_amr_fall , prcc_dataset$ICER) #unclear
+plot(prcc_dataset$a_amr_fall , prcc_dataset$NMB) #unclear
 
-plot(prcc_dataset$drr , prcc_dataset$ICER) #unclear
+plot(prcc_dataset$drr , prcc_dataset$NMB) #unclear
 
 id <- seq(from = 1, to = 10000, by = 1)
 
