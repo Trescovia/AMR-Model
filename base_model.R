@@ -213,8 +213,8 @@ model <- function(inputs){
   #time in hospital. After 1 period, all people in 'dead' go to 'afterlife', which
   #has a reward of zero
   
-  state_names <- c("well", "res","sus","dead", "afterlife") ## the compartments
-  transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s", "dead_aft")  ## the transition probabilities
+  state_names <- c("well", "res","sus","dead", "afterlife", "seq") ## the compartments
+  transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s", "dead_aft", "sick_seq")  ## the transition probabilities
   parameter_names <- c(state_names, transition_names)
   
   ## initial state vector (population starting in well)
@@ -226,12 +226,13 @@ model <- function(inputs){
   rownames(m_param) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
   
+  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t)
   m_param[ , "r"] <- rep(human[parameter=="well_r",value], n.t)
   m_param[ , "s"] <- rep(human[parameter=="well_s",value], n.t)
   m_param[ , "mort_r"] <- rep(human[parameter=="r_dead",value], n.t)
   m_param[ , "mort_s"] <- rep(human[parameter=="s_dead",value], n.t)
-  m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]), n.t)
-  m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]), n.t)
+  m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]+m_param[1,"sick_seq"]), n.t)
+  m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]+m_param[1,"sick_seq"]), n.t)
   m_param[ , "birth"] <- birthrate[1:n.t] ##set to be predicted net births
   m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births
   m_param[ , "dead_aft"] <- rep(1, n.t) #all those who die go to the afterlife
@@ -257,7 +258,9 @@ model <- function(inputs){
       ## note that this is the incidence of death due to how we then multiply with QALY loss but 
       # if change that should also add in + m_param[i-1,"dead"] 
       
-      m_param[i, "afterlife"] <- m_param[i-1, "afterlife"] + m_param[i-1, "dead"] #just keeps growing
+      m_param[i, "afterlife"] <- m_param[i-1, "afterlife"] + m_param[i-1, "dead"] + m_param[i-1, "seq"] #just keeps growing
+      
+      m_param[i, "seq"] <- m_param[i-1, "sick_seq"]*(m_param[i-1, "res"]+m_param[i-1, "sus"]) #only spend one period in 'seq' then go straight to the shadow realm
     }
     return(m_param)
   }
@@ -272,7 +275,7 @@ model <- function(inputs){
   c_r <- human[parameter=="r_cost",value]
   c_s <- human[parameter=="s_cost",value]
   
-  cost_i <- c(0,c_r,c_s,0, 0)
+  cost_i <- c(0,c_r,c_s,0,0,0)
   
   ## start at cycle 1 so you do not multiply initial state vector 
   m_cost[2, 1:length(state_names)] <- cost_i
@@ -294,15 +297,19 @@ model <- function(inputs){
   }
   pv_life <- sum(pv_fut_life)
   
+  pv_fut_life_seq <- c(rep(0,46)) #expected remaining life years
+  for (i in 1:46){
+    pv_fut_life_seq[i] <- human[parameter=="hrqol_seq",value] * (1-dr)^(i-1)
+  }
+  pv_life_seq <- sum(pv_fut_life_seq)
+  
   r_s <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_ill",value]-1) ## QoL lost from time in hospital
   r_r <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_res",value]-1) ## same but adjusted for longer LoS
   r_d <- -1 * pv_life #discounted QoL loss from death
+  r_seq <- pv_life - pv_life_seq
   
-  rwd_i <- c(0,r_r,r_s,r_d, 0) 
+  rwd_i <- c(0,r_r,r_s,r_d,0,r_seq) 
   
-  ##############################################################################
-  #have changed health state rewards to be 1, 0.98 0.975, 0, 0 
-  ##############################################################################
   
   ## start at cycle 1 so you do not multiply initial state vector 
   m_rwd[2, 1:length(state_names)] <- rwd_i
@@ -343,9 +350,6 @@ model <- function(inputs){
   
   #### Productivity Rewards #########
   
-  #calculate the discounted value of future work
-  #
-  
   m_rwd_prod <- matrix(rep(0), nrow = n.t, ncol = length(parameter_names))
   colnames(m_rwd_prod) <- parameter_names
   rownames(m_rwd_prod) <- paste("cycle", 0:(n.t-1), sep = "")
@@ -357,6 +361,10 @@ model <- function(inputs){
   r_w_prod <- 0
   
   r_aft_prod <- 0
+  
+  r_seq_prod <- 0 #importantly assumes that people with sequelae are equally productive
+  
+  #calculate the discounted value of future work
   
   yearly_prod <- (human[parameter=="prod",value] + human[parameter=="unpaid_prod", value])
   pv_fut_prod <- c(rep(0,34)) #expected remaining working years
@@ -373,9 +381,8 @@ model <- function(inputs){
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING PRODUCTIVITY OUTCOMES")
   }
   
-  
   #multiply the initial productivity rewards by the portion of people who are working
-  rwd_i_prod <- c(portion_working[1]*r_w_prod, portion_working[1]*r_r_prod, portion_working[1]*r_s_prod, portion_working[1]*r_d_prod, r_aft_prod)
+  rwd_i_prod <- c(portion_working[1]*r_w_prod, portion_working[1]*r_r_prod, portion_working[1]*r_s_prod, portion_working[1]*r_d_prod, r_aft_prod, r_seq_prod)
   
   ## start at cycle 1 so you do not multiply initial state vector
   m_rwd_prod[2,1:length(state_names)] <- rwd_i_prod 
@@ -702,8 +709,7 @@ model <- function(inputs){
   ### !!! need to check this because giving minus values
 
   ### costs and rewards are the same for healthcare system
-  ## rewards will change due to productivity changes' effect on income per animal sold
-  # costs change for each well add a cost of intervention
+  ## rewards will change due to effect on income per animal sold
   
   #rewards
   m_rwd_a2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
