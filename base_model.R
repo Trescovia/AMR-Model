@@ -1,5 +1,5 @@
 ####### LIBRARIES & DATA INPUts #######
-library(data.table)
+library("data.table")
 library("readxl")
 library("stargazer")
 library("tidyverse")
@@ -14,6 +14,7 @@ library("extraDistr")
 library("MonoInc")
 library("pksensi")
 library("sensitivity")
+library("xlsx")
 
 pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
@@ -171,6 +172,7 @@ dr <- 0.08 ## discount rate
 wtp <- 2365 ## willingness to pay per QALY gained
 scenario <- "HCA" #must be "HCA" or "FCA"
 scenario_transmission <- "Tang" #for now, must be "Tang" or "Booton"
+scenario_outcomes <- "Enterobacteria" #must be either "Enterobacteria" or "All"
 
 ############# model functions
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv")
@@ -225,10 +227,15 @@ model <- function(inputs){
   colnames(m_param) <- parameter_names
   rownames(m_param) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
+  if(scenario_outcomes == "All"){
+    tuning <- 2
+  }else if (scenario_outcomes == "Enterobacteria"){
+    tuning <- 1
+  }
   
   m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t)
-  m_param[ , "r"] <- rep(human[parameter=="well_r",value], n.t)
-  m_param[ , "s"] <- rep(human[parameter=="well_s",value], n.t)
+  m_param[ , "r"] <- rep(tuning*human[parameter=="well_r",value], n.t)
+  m_param[ , "s"] <- rep(tuning*human[parameter=="well_s",value], n.t)
   m_param[ , "mort_r"] <- rep(human[parameter=="r_dead",value], n.t)
   m_param[ , "mort_s"] <- rep(human[parameter=="s_dead",value], n.t)
   m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]+m_param[1,"sick_seq"]), n.t)
@@ -668,10 +675,10 @@ model <- function(inputs){
   m_param2 <- m_param ## parameter matrix for scenario 2
   
   if(scenario_transmission == "Tang"){
-    m_param2[ , "r"] <- rep(human[parameter=="well_r",value]-(human[parameter=="well_r",value]*intervention[parameter=="u_RH",value]),
+    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH",value]),
                             n.t)
   } else if(scenario_transmission == "Booton"){
-    m_param2[ , "r"] <- rep(human[parameter=="well_r",value]-(human[parameter=="well_r",value]*intervention[parameter=="u_RH_Booton",value]),
+    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH_Booton",value]),
                             n.t)
   } else{
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON HUMAN AMR")
@@ -866,6 +873,24 @@ model <- function(inputs){
 }
 # 
 model(inputs)
+
+scenario_analysis <- matrix(rep(0), nrow = 2, ncol = 2)
+colnames(scenario_analysis) <- c("Human Capital Approach", "Friction Cost Approach")
+rownames(scenario_analysis) <- c("Tang", "Booton")
+
+scenario <- "HCA"
+scenario_transmission <- "Tang"
+scenario_analysis[1,1] <- as.numeric(model(inputs)[1,12])
+scenario_transmission <- "Booton"
+scenario_analysis[2,1] <- as.numeric(model(inputs)[1,12])
+
+scenario <- "FCA"
+scenario_transmission <- "Tang"
+scenario_analysis[1,2] <- as.numeric(model(inputs)[1,12])
+scenario_transmission <- "Booton"
+scenario_analysis[2,2] <- as.numeric(model(inputs)[1,12])
+
+write.xlsx(scenario_analysis, "C:/Users/tresc/Desktop/AMR-Model/outputs/Scenario Analysis.xlsx")
 
 ##check the cost-effectiveness as a function of intervention cost per chicken
 ##and plot the cost-effective space
