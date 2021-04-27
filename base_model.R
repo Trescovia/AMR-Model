@@ -170,9 +170,11 @@ wb_population[3]
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 dr <- 0.08 ## discount rate
 wtp <- 2365 ## willingness to pay per QALY gained
+
+#Scenarios
 scenario <- "HCA" #must be "HCA" or "FCA"
 scenario_transmission <- "Tang" #for now, must be "Tang" or "Booton"
-scenario_outcomes <- "Enterobacteria" #must be either "Enterobacteria" or "All"
+scenario_outcomes <- "All" #must be either "Enterobacteria" or "All"
 
 ############# model functions
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv")
@@ -246,9 +248,14 @@ model <- function(inputs){
   
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
+  for (i in 2:(n.t)){
+    m_param[i, "r"] <- m_param[i-1, "r"]*human[parameter=="amr_growth", value]
+  }
+  
   ## the difference equation function: 
   f_human_epi <- function(m_param, n.t){
     for (i in 2:(n.t)){
+      
       m_param[i,"well"] <- m_param[i-1,"well"] -(m_param[i-1,"r"]*m_param[i-1,"well"]) -
         (m_param[i-1,"s"]*m_param[i-1,"well"]) + (m_param[i-1,"birth"]*m_param[i-1,"well"])-
         (m_param[i-1,"mort_w"]*m_param[i-1,"well"])+(m_param[i-1,"rec_r"]*m_param[i-1,"res"])+

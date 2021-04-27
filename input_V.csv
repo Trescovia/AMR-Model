@@ -61,3 +61,4 @@ intervention,u_RH_Booton,reduction in resistance in humans from reduction in ant
 intervention,u_RA_Booton,reduction in resistance in animals from reduction in antibiotic usage in animals (Booton),0.954,normal,0.665,0.997, , , ,
 human_0,sick_seq,chance of developing lifelong sequelae following an infection,0.405, , , , ,,,
 human_0,hrqol_seq,quality of life with sequelae,0.9355,,,,,,,
+human_0,amr_growth,annual growth in background AMR prevalence,1.02844688,uniform,1,1.04,"from Alvarez-Uria et al., 2018. Projection of worldwide trend in Enterobacteria AMR confidence intervals can be formed from their results",,,
