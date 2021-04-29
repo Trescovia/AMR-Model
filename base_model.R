@@ -520,12 +520,30 @@ model <- function(inputs){
     return(m_param_a)
     
   }
-
-  
   
   m_param_a <- f_animal_epi(m_param_a_base,n.t)
   ### ignore totals of transition probs etc. as they are over counted etc.
   ## just want to focus on health state totals
+  
+  #new
+  m_param_a_super <- matrix(rep(0), ncol = length(parameter_names_a), nrow = n.t)
+  m_param_a_super[1,] <- m_param_a[1,]
+  
+  for(i in 2:n.t){
+    m_param_a_base[, "r"] <- rep(m_param_a_base[i , "r"]*animal[parameter=="amu_a_growth", value]^(i-1), n.t)
+    if(m_param_a_base[i, "r"] > animal[parameter=="disease_risk", value]){
+      m_param_a_base[, "r"] <- rep(animal[parameter=="disease_risk", value], n.t)
+    }
+    m_param_a_base[, "s"] <- rep(animal[parameter=="disease_risk", value] - m_param_a_base[i, "r"], n.t)
+    
+    m_param_a <- f_animal_epi(m_param_a_base, n.t)
+    
+    m_param_a_super[i,] <- m_param_a[i,]
+  }
+  
+  m_param_a <- m_param_a_super
+  #new
+  
   
   #### farm cost ###########
   m_cost_a <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
@@ -752,8 +770,33 @@ model <- function(inputs){
   
   m_param_a2[ , 1:length(state_names_a)] <- 0
   m_param_a2[1, 1:length(state_names_a)] <- state_i_a
+  
+  #newnew
+  m_param_a_base2 <- m_param_a2
+  #newnew
 
   m_param_a2 <- f_animal_epi(m_param_a2, n.t)
+  
+  #newnew
+  m_param_a_super2 <- matrix(rep(0), ncol = length(parameter_names_a), nrow = n.t)
+  m_param_a_super2[1,] <- m_param_a2[1,]
+
+  for(i in 2:n.t){
+    m_param_a_base2[, "r"] <- rep(m_param_a2[i , "r"]*animal[parameter=="amu_a_growth", value]^(i-1), n.t)
+    if(m_param_a_base2[i, "r"] > animal[parameter=="disease_risk", value]){
+      m_param_a_base2[, "r"] <- rep(animal[parameter=="disease_risk", value], n.t)
+    }
+    m_param_a_base2[, "s"] <- rep(animal[parameter=="disease_risk", value] - m_param_a_base2[i, "r"], n.t)
+
+    m_param_a2 <- f_animal_epi(m_param_a_base2, n.t)
+
+    m_param_a_super2[i,] <- m_param_a2[i,]
+  }
+
+  m_param_a2 <- m_param_a_super2
+  #newnew
+  
+  
   ### !!! need to check this because giving minus values
 
   ### costs and rewards are the same for healthcare system
