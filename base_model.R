@@ -453,6 +453,12 @@ model <- function(inputs){
   m_param_a_base[ , "mort_w"] <- rep(animal[parameter=="well_dead",value], n.t)
   m_param_a_base[ , "w_sold"] <- rep(1, n.t) 
   
+  #new
+  for(i in 1:n.t){
+    m_param_a_base[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a_base[i, "r"]
+  }
+  #new
+  
   m_param_a_base[1, 1:length(state_names_a)] <- state_i_a
   
   f_animal_epi <- function(m_param_a_base, n.t){
@@ -505,14 +511,17 @@ model <- function(inputs){
     
     m_a_sum <- animal[parameter=="annual_cycles",value] * m_a_sum #multiply by the number of annual cycles
     
-    ### repeat to get 10 cycles....
+    ### repeat to get all cycles....
     m_param_a <- matrix(rep(m_a_sum), nrow=n.t, ncol =length(parameter_names_a))
     m_param_a <- t(replicate(n.t,m_a_sum))
     colnames(m_param_a) <- parameter_names_a
     rownames(m_param_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
     
     return(m_param_a)
+    
   }
+
+  
   
   m_param_a <- f_animal_epi(m_param_a_base,n.t)
   ### ignore totals of transition probs etc. as they are over counted etc.
