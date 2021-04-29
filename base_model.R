@@ -750,13 +750,38 @@ model <- function(inputs){
   m_param2 <- f_human_epi(m_param2, n.t)
 
   ## animals
-  m_param_a2 <- m_param_a_base
+  #m_param_a2 <- m_param_a_base #newnew on the commenting out, as we remake m_param_a2 from scratch below now to avoid starting with the very high prevalence
+  
+  #newnewnew
+  m_param_a_base2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
+  colnames(m_param_a_base2) <- parameter_names_a
+  rownames(m_param_a_base2) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  
+  m_param_a_base2[ , "r"] <- rep(animal[parameter=="well_r",value], n.t)
+  m_param_a_base2[ , "s"] <- rep(animal[parameter=="well_s",value], n.t)
+  m_param_a_base2[ , "mort_s"] <- rep(animal[parameter=="s_dead",value], n.t)
+  m_param_a_base2[ , "mort_r"] <- rep(animal[parameter=="r_dead",value], n.t)
+  m_param_a_base2[ , "rec_r"] <- rep(1-(m_param_a_base2[1,"mort_r"]), n.t)
+  m_param_a_base2[ , "rec_s"] <- rep(1-(m_param_a_base2[1,"mort_s"]), n.t)
+  m_param_a_base2[ , "birth"] <- rep(animal[parameter=="birth_well",value], n.t) ## !!! doesn't really do anything for now given restructure 
+  m_param_a_base2[ , "mort_w"] <- rep(animal[parameter=="well_dead",value], n.t)
+  m_param_a_base2[ , "w_sold"] <- rep(1, n.t) 
+  #newnewnew
+  
+  #new
+  for(i in 1:n.t){
+    m_param_a_base2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a_base[i, "r"]
+  }
+  #new
+  
+  m_param_a_base2[1, 1:length(state_names_a)] <- state_i_a
+  #newnew
   
   if(scenario_transmission == "Tang"){
-    m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
+    m_param_a_base2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
                               n.t)
   } else if(scenario_transmission == "Booton"){
-    m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA_Booton",value]),
+    m_param_a_base2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA_Booton",value]),
                               n.t)
   } else{
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON ANIMAL AMR")
@@ -764,18 +789,18 @@ model <- function(inputs){
   
   #new
   for(i in 1:n.t){
-    m_param_a2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a2[i, "r"]
+    m_param_a_base2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a_base2[i, "r"]
   }
   #new
   
-  m_param_a2[ , 1:length(state_names_a)] <- 0
-  m_param_a2[1, 1:length(state_names_a)] <- state_i_a
+  m_param_a_base2[ , 1:length(state_names_a)] <- 0
+  m_param_a_base2[1, 1:length(state_names_a)] <- state_i_a
   
   #newnew
-  m_param_a_base2 <- m_param_a2
+  #m_param_a_base2 <- m_param_a2
   #newnew
 
-  m_param_a2 <- f_animal_epi(m_param_a2, n.t)
+  m_param_a2 <- f_animal_epi(m_param_a_base2, n.t)
   
   #newnew
   m_param_a_super2 <- matrix(rep(0), ncol = length(parameter_names_a), nrow = n.t)
