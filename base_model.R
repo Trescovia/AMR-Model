@@ -252,6 +252,17 @@ model <- function(inputs){
     m_param[i, "r"] <- m_param[i-1, "r"]*human[parameter=="amr_growth", value]
   }
   
+  #new
+  disease_max <- human[parameter=="disease_risk", value]
+  
+  for(i in 1:n.t){
+    if(m_param[i, "r"] > disease_max){
+      m_param[i, "r"] <- disease_max
+    }
+    m_param[i, "s"] <- disease_max - m_param[i, "r"]
+  }
+  #new
+  
   ## the difference equation function: 
   f_human_epi <- function(m_param, n.t){
     for (i in 2:(n.t)){
@@ -690,6 +701,15 @@ model <- function(inputs){
   } else{
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON HUMAN AMR")
   }
+  
+  #new
+  for(i in 1:n.t){
+    if(m_param[i, "r"] > disease_max){
+      m_param[i, "r"] <- disease_max
+    }
+    m_param[i, "s"] <- disease_max - m_param[i, "r"]
+  }
+  #new
 
   ## this is assuming a reduction in drug resistant infections
   ## if you want to then just change the proportion that are resistant
@@ -705,7 +725,6 @@ model <- function(inputs){
   ## animals
   m_param_a2 <- m_param_a_base
   
-  
   if(scenario_transmission == "Tang"){
     m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
                               n.t)
@@ -715,6 +734,12 @@ model <- function(inputs){
   } else{
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON ANIMAL AMR")
   }
+  
+  #new
+  for(i in 1:n.t){
+    m_param_a2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a2[i, "r"]
+  }
+  #new
   
   m_param_a2[ , 1:length(state_names_a)] <- 0
   m_param_a2[1, 1:length(state_names_a)] <- state_i_a
@@ -869,7 +894,8 @@ model <- function(inputs){
 
   outputs <- data.table(incr_cost=incr_cost, incr_benefit=incr_benefit,
                         incr_cost_a=incr_cost_a, incr_benefit_a=incr_benefit_a, 
-                        #incr_benefit_p=incr_benefit_p, incr_cost_p=incr_cost_p, CBR_p=CBR_p, NMB_A_p=NMB_A_p, NMB_A_all=NMB_A_all
+                        #incr_benefit_p=incr_benefit_p, incr_cost_p=incr_cost_p, CBR_p=CBR_p, NMB_A_p=NMB_A_p, 
+                        NMB_A_all=NMB_A_all,
                         icer=icer, CBR = CBR, NMB_H=NMB_H, NMB_A=NMB_A, icer_prod = icer_prod, 
                         NMB_prod = NMB_prod, net_monetary_gain_macro = net_monetary_gain_macro,
                         NMB_macro = NMB_macro, icer_macro = icer_macro, implementation_cost = implementation_cost)
