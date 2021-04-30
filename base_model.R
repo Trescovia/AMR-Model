@@ -16,6 +16,17 @@ library("pksensi")
 library("sensitivity")
 library("xlsx")
 
+###
+# in this section, we use demographic data from Viet Nam (population, dependency ratio, etc.)
+# to forecast the at-risk population and the working population throughout our time frame
+# what we refer to as 'births' in this model is actually net births, and this is represented by the
+# 'birth' transition parameter. We set background mortality to zero, as background mortality is already
+# captured by net births. This does, however, mean that the rate of population growth  in our model
+# is independent of the number of deaths from BSIs, although in reality the two may be related.
+# This therefore relies on the assumption that the amount of deaths from BSIs is not systemically
+# important in the sense that it can influence demographic trajectory
+###
+
 pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
 ARIMApop <- auto.arima(pop, stepwise = F, approximation = F)
@@ -165,6 +176,17 @@ wb_population[3]
 
 ################################################################################
 
+###
+# Here, we define our scenarios. We set the number of periods to be 46 (the expected
+# remaining life years in our population). We let the discount rate be 0.08 and the 
+# willingness to pay for a WALY be 2365 USD, both of which are derived from theory.
+# We have possible scenarios for a) the way we estimate productivity outcomes from
+# morbidity and mortality (either the human capital approach or the friction cost 
+# approach), b) the link parameter between animal AMU and human AMR (either from Tang
+# or from Booton), and c) the infection types looked at (either all BSIs or all BSIs
+# caused by Enterobacteriaceae spp.)
+###
+
 
 ###### defined parameters across the sectors ######
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
@@ -215,7 +237,12 @@ model <- function(inputs){
   #loss equal to the discounted value of future earnings, going into the 'res' or 'sus
   #states incurs a loss equal to the earnings that would have been made during the 
   #time in hospital. After 1 period, all people in 'dead' go to 'afterlife', which
-  #has a reward of zero
+  #has a reward of zero. There is also a sequelae state - people in this state only 
+  #stay there for one period before continuing peacefully into the afterlife. This
+  #is only for convenience and does not imply that people with sequelae die after one 
+  #year. Rather, the cost of being in the sequelae state for one turn is equal to the
+  #difference in discounted future welfare between a pefectly healthy expected remainder
+  #of life and an expected remainder of life with sequelae
   
   state_names <- c("well", "res","sus","dead", "afterlife", "seq") ## the compartments
   transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s", "dead_aft", "sick_seq")  ## the transition probabilities
@@ -248,11 +275,15 @@ model <- function(inputs){
   
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
+  #letting the chance of getting infected with resistant bacteria grow in each period
   for (i in 2:(n.t)){
     m_param[i, "r"] <- m_param[i-1, "r"]*human[parameter=="amr_growth", value]
   }
   
-  #new
+  #keeping the overall prevalence of disease constant, we make sure that the number
+  #of infections with susceptible and resistant bacteria sum to the total number of
+  #infections. Thus, the highest resistance outcome is one in which all infections are
+  #resistant but the total number of infections remains the same
   disease_max <- human[parameter=="disease_risk", value]
   
   for(i in 1:n.t){
@@ -261,7 +292,6 @@ model <- function(inputs){
     }
     m_param[i, "s"] <- disease_max - m_param[i, "r"]
   }
-  #new
   
   ## the difference equation function: 
   f_human_epi <- function(m_param, n.t){
@@ -280,8 +310,6 @@ model <- function(inputs){
       
       m_param[i,"dead"] <- (m_param[i-1,"mort_r"]*m_param[i-1,"res"]) + (m_param[i-1,"mort_s"]*m_param[i-1,"sus"])+
         (m_param[i-1,"mort_w"]*m_param[i-1,"well"])
-      ## note that this is the incidence of death due to how we then multiply with QALY loss but 
-      # if change that should also add in + m_param[i-1,"dead"] 
       
       m_param[i, "afterlife"] <- m_param[i-1, "afterlife"] + m_param[i-1, "dead"] + m_param[i-1, "seq"] #just keeps growing
       
@@ -290,7 +318,7 @@ model <- function(inputs){
     return(m_param)
   }
   
-  m_param <- f_human_epi(m_param,n.t) ## currently population growth over time
+  m_param <- f_human_epi(m_param,n.t) #applying the epi function for humans (base case)
   
   #### HC system cost ###########
   m_cost <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names))
@@ -300,7 +328,7 @@ model <- function(inputs){
   c_r <- human[parameter=="r_cost",value]
   c_s <- human[parameter=="s_cost",value]
   
-  cost_i <- c(0,c_r,c_s,0,0,0)
+  cost_i <- c(0,c_r,c_s,0,0,0) #only infections incur a healthcare cost here
   
   ## start at cycle 1 so you do not multiply initial state vector 
   m_cost[2, 1:length(state_names)] <- cost_i
@@ -316,6 +344,10 @@ model <- function(inputs){
   colnames(m_rwd) <- parameter_names
   rownames(m_rwd) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
+  #calculate the present value of expected remaining life years for a) a perfectly
+  #healthy person and b) someone with sequelae. The negative difference is the 'reward' 
+  #of being in the sequelae state 
+  
   pv_fut_life <- c(rep(0,46)) #expected remaining life years
   for (i in 1:46){
     pv_fut_life[i] <- human[parameter=="background_qol",value] * (1-dr)^(i-1)
@@ -327,6 +359,11 @@ model <- function(inputs){
     pv_fut_life_seq[i] <- human[parameter=="hrqol_seq",value] * (1-dr)^(i-1)
   }
   pv_life_seq <- sum(pv_fut_life_seq)
+  
+  #the 'reward' for death is the negative of the present value of remaining life 
+  #years, and the 'reward' for being infected is the loss of welfare while hospitalised
+  #therefore the scenario with more deaths, infections and sequelae will have a negative
+  #'reward' of larger absolute value
   
   r_s <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_ill",value]-1) ## QoL lost from time in hospital
   r_r <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_res",value]-1) ## same but adjusted for longer LoS
@@ -349,11 +386,17 @@ model <- function(inputs){
   #### Productivity Costs ###########
   #for HCA and FCA, we only care about the losses in productivity, so we set the 
   #reward for 'well' to be zero. Going into the 'dead' state incurs a productivity
-  #loss equal to the discounted value of future earnings, going into the 'res' or 'sus
-  #states incurs a loss equal to the earnings that would have been made during the 
-  #time in hospital. After 1 period, all people in 'dead' go to 'afterlife', which
-  #has a reward of zero
+  #loss equal to the discounted value of forgone future earnings, going into the
+  #'res' or 'sus states incurs a loss equal to the earnings that would have
+  #been made during the time in hospital. After 1 period, all people in 'dead' go
+  #to 'afterlife', which has a reward of zero. 
+  #Using the HCA, the forgone future earnings are those of expected remaining economically
+  #active years. For FCA, it is the forgone earnings during the time that it takes
+  #to find a replacement worker
   
+  
+  #all productivity rewards are set to zero, and we only see a difference between
+  #the reward matrices of different scenarios
   m_cost_prod <- matrix(rep(0),nrow = n.t, ncol = length(parameter_names))
   colnames(m_cost_prod) <- parameter_names
   rownames(m_cost_prod) <- paste("cycle", 0:(n.t-1), sep = "")
@@ -375,6 +418,9 @@ model <- function(inputs){
   
   #### Productivity Rewards #########
   
+  #the 'reward' for being infected is equal to the negative forgone productivity
+  #while hospitalised
+  
   m_rwd_prod <- matrix(rep(0), nrow = n.t, ncol = length(parameter_names))
   colnames(m_rwd_prod) <- parameter_names
   rownames(m_rwd_prod) <- paste("cycle", 0:(n.t-1), sep = "")
@@ -389,7 +435,8 @@ model <- function(inputs){
   
   r_seq_prod <- 0 #importantly assumes that people with sequelae are equally productive
   
-  #calculate the discounted value of future work
+  #the reward for dead is the present discounted value of future work (either for the
+  #remainder of economically active life, or for the 6 months needed to find a replacement)
   
   yearly_prod <- (human[parameter=="prod",value] + human[parameter=="unpaid_prod", value])
   pv_fut_prod <- c(rep(0,34)) #expected remaining working years
@@ -412,7 +459,7 @@ model <- function(inputs){
   ## start at cycle 1 so you do not multiply initial state vector
   m_rwd_prod[2,1:length(state_names)] <- rwd_i_prod 
   
-  ### discount, but also sneakily add the labour productivity growth
+  ### discount, but also account for labour productivity growth
   
   dr_pgrowth <- dr - human[parameter=="prod_growth", value] ##discount rate net of productivity growth (in this case prod growth exceeds discount rate)
   
@@ -432,9 +479,12 @@ model <- function(inputs){
   
   ###################*****ANIMAL MODEL*****###########################
   
+  #in this model, we assume that all animals are born on the farm. This will make 
+  #no difference on aggregate, as the income from selling chicks is by necessity
+  #equal to the expense of buying them
+  
   state_names_a <- c("well", "res","sus","fallen","sold") ## the compartments
   transition_names_a  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s","w_sold")  ## the rates
-  ## birth = replacement in this scenario
   parameter_names_a <- c(state_names_a, transition_names_a)
   
   state_i_a <- c(intervention[parameter=="n_animals",value], rep(0,length=length(state_names_a)-1))
@@ -449,21 +499,19 @@ model <- function(inputs){
   m_param_a_base[ , "mort_r"] <- rep(animal[parameter=="r_dead",value], n.t)
   m_param_a_base[ , "rec_r"] <- rep(1-(m_param_a_base[1,"mort_r"]), n.t)
   m_param_a_base[ , "rec_s"] <- rep(1-(m_param_a_base[1,"mort_s"]), n.t)
-  m_param_a_base[ , "birth"] <- rep(animal[parameter=="birth_well",value], n.t) ## !!! doesn't really do anything for now given restructure 
+  m_param_a_base[ , "birth"] <- rep(animal[parameter=="birth_well",value], n.t)
   m_param_a_base[ , "mort_w"] <- rep(animal[parameter=="well_dead",value], n.t)
   m_param_a_base[ , "w_sold"] <- rep(1, n.t) 
   
-  #new
+  #make it so that the total incidence of infections stays the same, and only the
+  #portion of them that are resistant changes
   for(i in 1:n.t){
     m_param_a_base[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a_base[i, "r"]
   }
-  #new
   
   m_param_a_base[1, 1:length(state_names_a)] <- state_i_a
   
   f_animal_epi <- function(m_param_a_base, n.t){
-    ### !!! started process to update to include tunnel states
-    ## but need to go through and check this
     ### this has for each cycle;
     ## row 1: all the new animals in well bought
     ## row 2: all the cycle transitions to ill 
@@ -472,10 +520,6 @@ model <- function(inputs){
     ### then need to sum up across these for each cycle
     ## so you have number of bought, ill, and sold for each cycle
     ## currently assuming those who die of illness/prematurely are not sold !!! probably needs investigating
-    
-    ## current structure assumes nothing changes over time
-    ## if things do can build each individual cycle aggregates
-    ## based on the changes wanted
     
     ## create mini matrix to represent the 4 rows per cycle
     
@@ -511,7 +555,8 @@ model <- function(inputs){
     
     m_a_sum <- animal[parameter=="annual_cycles",value] * m_a_sum #multiply by the number of annual cycles
     
-    ### repeat to get all cycles....
+    #repeat to get all cycles - in this branch, the animal production side is the same in every year
+    #and nothing changes
     m_param_a <- matrix(rep(m_a_sum), nrow=n.t, ncol =length(parameter_names_a))
     m_param_a <- t(replicate(n.t,m_a_sum))
     colnames(m_param_a) <- parameter_names_a
@@ -521,8 +566,7 @@ model <- function(inputs){
     
   }
 
-  
-  
+  #apply the animal epi function:
   m_param_a <- f_animal_epi(m_param_a_base,n.t)
   ### ignore totals of transition probs etc. as they are over counted etc.
   ## just want to focus on health state totals
@@ -532,15 +576,16 @@ model <- function(inputs){
   colnames(m_cost_a) <- parameter_names_a
   rownames(m_cost_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
-  c_w <- animal[parameter=="c_animal",value] ## defining cost of having the animal
+  c_w <- animal[parameter=="c_animal",value] ## defining cost of keeping the animal
   c_s <- animal[parameter=="s_cost",value] ## defining cost of treating infections
   c_r <- animal[parameter=="r_cost",value]
   
-  cost_i_a <- c(c_w,c_w + c_r,c_w + c_s,0,0) #changed so farm still pays upkeep c_w on infected animals
+  cost_i_a <- c(c_w,c_w + c_r,c_w + c_s,0,0) #the farm still pays upkeep for sick animals
   
   ## start at cycle 1 so you do not multiply initial state vector 
   m_cost_a[2, 1:length(state_names_a)] <- cost_i_a 
   
+  #discount the farm costs
   for (j in 1:length(state_names_a)) {
     for (i in 3:(n.t)){
       m_cost_a[i,j] <- f_di(m_cost_a[i-1,j],dr)
@@ -552,147 +597,19 @@ model <- function(inputs){
   colnames(m_rwd_a) <- parameter_names_a
   rownames(m_rwd_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
-  
+  #only get a reward for selling animals
   r_sold <- animal[parameter=="i_animal",value] ## defining the income from a sold animal
   rwd_i_a <- c(0,0,0,0,r_sold)
   
   ## start at cycle 1 so you do not multiply initial state vector 
   m_rwd_a[2, 1:length(state_names_a)] <- rwd_i_a
   
+  #discount
   for (j in 1:length(state_names_a)) {
     for (i in 3:(n.t)){
       m_rwd_a[i,j] <- f_di(m_rwd_a[i-1,j],dr)
     }  
   }
-  
-  ###########################pig model##########################################
-  
-  ###################*****ANIMAL MODEL*****###########################
-  
-  # state_names_p <- c("well", "res","sus","fallen","sold") ## the compartments
-  # transition_names_p  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s","w_sold")  ## the rates
-  # ## birth = replacement in this scenario
-  # parameter_names_p <- c(state_names_p, transition_names_p)
-  # 
-  # state_i_p <- c(pig[parameter=="n_animals",value], rep(0,length=length(state_names_p)-1))
-  # 
-  # m_param_p_base <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_p))
-  # colnames(m_param_p_base) <- parameter_names_p
-  # rownames(m_param_p_base) <- paste("cycle", 0:(n.t-1), sep  =  "")
-  # 
-  # m_param_p_base[ , "r"] <- rep(pig[parameter=="well_r",value], n.t)
-  # m_param_p_base[ , "s"] <- rep(pig[parameter=="well_s",value], n.t)
-  # m_param_p_base[ , "mort_s"] <- rep(pig[parameter=="s_dead",value], n.t)
-  # m_param_p_base[ , "mort_r"] <- rep(pig[parameter=="r_dead",value], n.t)
-  # m_param_p_base[ , "rec_r"] <- rep(1-(m_param_p_base[1,"mort_r"]), n.t)
-  # m_param_p_base[ , "rec_s"] <- rep(1-(m_param_p_base[1,"mort_s"]), n.t)
-  # m_param_p_base[ , "birth"] <- rep(pig[parameter=="birth_well",value], n.t) ## !!! doesn't really do anything for now given restructure
-  # m_param_p_base[ , "mort_w"] <- rep(pig[parameter=="well_dead",value], n.t)
-  # m_param_p_base[ , "w_sold"] <- rep(1, n.t)
-  # 
-  # m_param_p_base[1, 1:length(state_names_p)] <- state_i_p
-  # 
-  # f_pig_epi <- function(m_param_p_base, n.t){
-  #   ### !!! started process to update to include tunnel states
-  #   ## but need to go through and check this
-  #   ### this has for each cycle;
-  #   ## row 1: all the new animals in well bought
-  #   ## row 2: all the cycle transitions to ill
-  #   ## row 3: they recover/die from ill
-  #   ## row 4: all the well go to sold
-  #   ### then need to sum up across these for each cycle
-  #   ## so you have number of bought, ill, and sold for each cycle
-  #   ## currently assuming those who die of illness/prematurely are not sold !!! probably needs investigating
-  # 
-  #   ## current structure assumes nothing changes over time
-  #   ## if things do can build each individual cycle aggregates
-  #   ## based on the changes wanted
-  # 
-  #   ## create mini matrix to represent the 4 rows per cycle
-  # 
-  #   m_param_p_temp <- m_param_p_base[1:4,]
-  #   rownames(m_param_p_temp) <- NULL ##removing rownames
-  # 
-  #   ### split over time to allow for transition probabilities to sum to 1
-  #   ### first transitions
-  #   i<- 2 ## row 2 definitions ## background mortality happens at beginning of cycle
-  #   m_param_p_temp[i,"well"] <- m_param_p_temp[i-1,"well"] -(m_param_p_temp[i-1,"r"]*m_param_p_temp[i-1,"well"]) -
-  #     (m_param_p_temp[i-1,"s"]*m_param_p_temp[i-1,"well"]) - (m_param_p_temp[i-1,"mort_w"]*m_param_p_temp[i-1,"well"])
-  #   m_param_p_temp[i,"res"] <- m_param_p_temp[i-1,"res"] + (m_param_p_temp[i-1,"r"]*m_param_p_temp[i-1,"well"])
-  #   m_param_p_temp[i,"sus"] <- m_param_p_temp[i-1,"sus"] + (m_param_p_temp[i-1,"s"]*m_param_p_temp[i-1,"well"])
-  #   m_param_p_temp[i,"fallen"] <- (m_param_p_temp[i-1,"mort_w"]*m_param_p_temp[i-1,"well"])
-  # 
-  #   i <- 3 ###
-  #   m_param_p_temp[i,"well"] <-  m_param_p_temp[i-1,"well"]+(m_param_p_temp[i-1,"rec_r"]*m_param_p_temp[i-1,"res"])+
-  #     (m_param_p_temp[i-1,"rec_s"]*m_param_p_temp[i-1,"sus"])
-  #   m_param_p_temp[i,"res"] <- m_param_p_temp[i-1,"res"] -  (m_param_p_temp[i-1,"mort_r"]*m_param_p_temp[i-1,"res"]) -
-  #     (m_param_p_temp[i-1,"rec_r"]*m_param_p_temp[i-1,"res"])
-  #   m_param_p_temp[i,"sus"] <- m_param_p_temp[i-1,"sus"] -
-  #     (m_param_p_temp[i-1,"mort_s"]*m_param_p_temp[i-1,"sus"]) - (m_param_p_temp[i-1,"rec_s"]*m_param_p_temp[i-1,"sus"])
-  #   m_param_a_temp[i,"fallen"] <- (m_param_a_temp[i-1,"mort_r"]*m_param_a_temp[i-1,"res"]) +
-  #     (m_param_p_temp[i-1,"mort_s"]*m_param_p_temp[i-1,"sus"]) ## didn't include previous number in fallen as want to sum
-  #   # so avoids double counting
-  # 
-  #   i <-4 ## moving to sold/not-sold states
-  #   m_param_p_temp[i,"sold"] <- (m_param_p_temp[i-1,"w_sold"]*m_param_p_temp[i-1,"well"])
-  # 
-  #   ### aggregate
-  #   m_p_sum <- colSums(m_param_p_temp) ## sum over the 4 rows
-  #   m_p_sum[1] <- state_i_p[1] ## reset Well sum (as this is the only one currently double counting..hopefully)
-  # 
-  #   m_p_sum <- pig[parameter=="annual_cycles",value] * m_p_sum #multiply by the number of annual cycles
-  # 
-  #   ### repeat to get all cycles....
-  #   m_param_p <- matrix(rep(m_p_sum), nrow=n.t, ncol =length(parameter_names_p))
-  #   m_param_p <- t(replicate(n.t,m_p_sum))
-  #   colnames(m_param_p) <- parameter_names_p
-  #   rownames(m_param_p) <- paste("cycle", 0:(n.t-1), sep  =  "")
-  # 
-  #   return(m_param_p)
-  # }
-  # 
-  # m_param_p <- f_pig_epi(m_param_p_base,n.t)
-  # ### ignore totals of transition probs etc. as they are over counted etc.
-  # ## just want to focus on health state totals
-  # 
-  # #### farm cost ###########
-  # m_cost_p <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_p))
-  # colnames(m_cost_p) <- parameter_names_p
-  # rownames(m_cost_p) <- paste("cycle", 0:(n.t-1), sep  =  "")
-  # 
-  # c_w_p <- pig[parameter=="c_pig",value] ## defining cost of having the pig
-  # c_s_p <- pig[parameter=="s_cost",value] ## defining cost of treating infections
-  # c_r_p <- pig[parameter=="r_cost",value]
-  # 
-  # cost_i_p <- c(c_w_p,c_w_p + c_r_p,c_w_p + c_s_p,0,0) #changed so farm still pays upkeep c_w_p on infected animals
-  # 
-  # ## start at cycle 1 so you do not multiply initial state vector
-  # m_cost_p[2, 1:length(state_names_p)] <- cost_i_p
-  # 
-  # for (j in 1:length(state_names_p)) {
-  #   for (i in 3:(n.t)){
-  #     m_cost_p[i,j] <- f_di(m_cost_p[i-1,j],dr)
-  #   }
-  # }
-  # 
-  # #### farm rewards ##################
-  # m_rwd_p <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_p))
-  # colnames(m_rwd_p) <- parameter_names_p
-  # rownames(m_rwd_p) <- paste("cycle", 0:(n.t-1), sep  =  "")
-  # 
-  # 
-  # r_sold_p <- pig[parameter=="i_pig",value] ## defining the income from a sold piggie
-  # rwd_i_p <- c(0,0,0,0,r_sold_p)
-  # 
-  # ## start at cycle 1 so you do not multiply initial state vector
-  # m_rwd_p[2, 1:length(state_names_p)] <- rwd_i_p
-  # 
-  # for (j in 1:length(state_names_p)) {
-  #   for (i in 3:(n.t)){
-  #     m_rwd_p[i,j] <- f_di(m_rwd_p[i-1,j],dr)
-  #   }
-  # }
-
   ##############################################################################
 
   ##########*****INTERVENTION****** ############################
@@ -701,6 +618,7 @@ model <- function(inputs){
   ### humans
   m_param2 <- m_param ## parameter matrix for scenario 2
   
+  #reduce the chance of getting a resistant infection in humans, depending on the link parameter used
   if(scenario_transmission == "Tang"){
     m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH",value]),
                             n.t)
@@ -711,29 +629,24 @@ model <- function(inputs){
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON HUMAN AMR")
   }
   
-  #new
+  #make sure that the total number of infections remains constant
   for(i in 1:n.t){
     if(m_param[i, "r"] > disease_max){
       m_param[i, "r"] <- disease_max
     }
     m_param[i, "s"] <- disease_max - m_param[i, "r"]
   }
-  #new
-
-  ## this is assuming a reduction in drug resistant infections
-  ## if you want to then just change the proportion that are resistant
-  ## but keep total infection numbers constant
-  ## would also have to change the well2susceptible transition prob here also
 
   ## clear state values
   m_param2[ , 1:length(state_names)] <- 0
   m_param2[1, 1:length(state_names)] <- state_i
 
-  m_param2 <- f_human_epi(m_param2, n.t)
+  m_param2 <- f_human_epi(m_param2, n.t) #apply the human epi function to the intervention case
 
   ## animals
-  m_param_a2 <- m_param_a_base
+  m_param_a2 <- m_param_a_base #create an animal parameter spreadsheet for the intervention case
   
+  #reduce the prevalence of resistant infections in animals, according to the link parameter being used
   if(scenario_transmission == "Tang"){
     m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
                               n.t)
@@ -744,20 +657,16 @@ model <- function(inputs){
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON ANIMAL AMR")
   }
   
-  #new
+  #make sure the total number of infections stays constant
   for(i in 1:n.t){
     m_param_a2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a2[i, "r"]
   }
-  #new
   
   m_param_a2[ , 1:length(state_names_a)] <- 0
   m_param_a2[1, 1:length(state_names_a)] <- state_i_a
 
-  m_param_a2 <- f_animal_epi(m_param_a2, n.t)
-  ### !!! need to check this because giving minus values
-
-  ### costs and rewards are the same for healthcare system
-  ## rewards will change due to effect on income per animal sold
+  #apply the animal epi function to the intervention case parameter spreadsheet
+  m_param_a2 <- f_animal_epi(m_param_a2, n.t) 
   
   #rewards
   m_rwd_a2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
@@ -770,6 +679,7 @@ model <- function(inputs){
   ## start at cycle 1 so you do not multiply initial state vector 
   m_rwd_a2[2, 1:length(state_names_a)] <- rwd_i_a2
   
+  #discount
   for (j in 1:length(state_names_a)) {
     for (i in 3:(n.t)){
       m_rwd_a2[i,j] <- f_di(m_rwd_a2[i-1,j],dr)
@@ -785,52 +695,25 @@ model <- function(inputs){
   c_r <- animal[parameter=="r_cost",value] #removed double-paying 
   #c_interv <- intervention[parameter=="int_cost_per",value] #commented out as the farm-level economic effect now manifests itself in the rewards
 
-  cost_i_a2 <- c(c_w, c_w + c_r,c_w + c_s,0,0) #changed it so you still pay upkeep on animals who are treated or infected
+  cost_i_a2 <- c(c_w, c_w + c_r,c_w + c_s,0,0) #you still pay upkeep on animals who are treated or infected
 
   ## start at cycle 1 so you do not multiply initial state vector
   m_cost_a2[2, 1:length(state_names_a)] <- cost_i_a2
 
+  #discount
   for (j in 1:length(state_names_a)) {
     for (i in 3:(n.t)){
       m_cost_a2[i,j] <- f_di(m_cost_a2[i-1,j],dr)
     }
   }
   
-  ## pigs
-  # m_param_p2 <- m_param_p_base
-  # m_param_p2[ , "r"] <- rep(pig[parameter=="well_r",value]-(pig[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
-  #                           n.t)
-  # m_param_p2[ , 1:length(state_names_p)] <- 0
-  # m_param_p2[1, 1:length(state_names_p)] <- state_i_p
-  # 
-  # m_param_p2 <- f_pig_epi(m_param_p2, n.t)
-  # 
-  # m_cost_p2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_p))
-  # colnames(m_cost_p) <- parameter_names_p
-  # rownames(m_cost_p) <- paste("cycle", 0:(n.t-1), sep  =  "")
-  # 
-  # c_s_p <- pig[parameter=="s_cost",value]
-  # c_r_p <- c_s_p+(c_s_p*pig[parameter=="r_cost",value])
-  # c_interv_p <- pig[parameter=="int_cost_per",value]
-  # 
-  # cost_i_p2 <- c(c_w_p + c_interv_p,c_w_p + c_r_p,c_w_p + c_s_p,0,0) #changed it so you still pay upkeep on animals who are treated or infected
-  # 
-  # ## start at cycle 1 so you do not multiply initial state vector
-  # m_cost_p2[2, 1:length(state_names_p)] <- cost_i_p2
-  # 
-  # for (j in 1:length(state_names_p)) {
-  #   for (i in 3:(n.t)){
-  #     m_cost_p2[i,j] <- f_di(m_cost_p2[i-1,j],dr)
-  #   }
-  # }  
-  
   ############ RESULTS #######################
+  
+  #get a results matrix for healthcare and chickens
   results_base_h <- f_expvalue(m_param,m_cost,m_rwd)
   results_base_a <- f_expvalue(m_param_a,m_cost_a,m_rwd_a)
   results_interv_h <- f_expvalue(m_param2,m_cost,m_rwd)
   results_interv_a <- f_expvalue(m_param_a2,m_cost_a2,m_rwd_a2)
-  #results_base_p <- f_expvalue(m_param_p,m_cost_p,m_rwd_p)
-  #results_interv_p <- f_expvalue(m_param_p2,m_cost_p2,m_rwd_p)
   
   total_results_HC<- matrix(rep(0), nrow=2, ncol=2)
   colnames(total_results_HC) <- c("Costs (£)", "QALYs")
@@ -839,6 +722,7 @@ model <- function(inputs){
   total_results_HC[1,] <- results_base_h[1,]
   total_results_HC[2,] <- results_interv_h[1,]
   
+  #get a results matrix for productivity
   results_base_prod <- f_expvalue(m_param,m_cost_prod,m_rwd_prod)
   results_interv_prod <- f_expvalue(m_param2,m_cost_prod,m_rwd_prod)
   
@@ -855,7 +739,7 @@ model <- function(inputs){
   incr_cost <- (results_interv_h[1,1] - results_base_h[1,1])
   incr_benefit <-  (results_interv_h[1,2]-results_base_h[1,2])
   icer <- incr_cost/incr_benefit
-  NMB_H <- (incr_benefit*wtp)-(incr_cost)  # per person in the population
+  NMB_H <- (incr_benefit*wtp)-(incr_cost)
   
   #############################################################################
   #because there technically aren't any costs for the productivity side,
@@ -871,39 +755,32 @@ model <- function(inputs){
   ## Farm level
   incr_cost_a <- (results_interv_a[1,1] - results_base_a[1,1])
   incr_benefit_a <-  (results_interv_a[1,2]-results_base_a[1,2])
-  # incr_cost_p <- (results_interv_p[1,1] - results_base_p[1,1])
-  # incr_benefit_p <-  (results_interv_p[1,2]-results_base_p[1,2])
   
   total_results_Ag<- matrix(rep(0), nrow=2, ncol=2)
   colnames(total_results_Ag) <- c("Costs (£)", "Benefits (£)")
   rownames(total_results_Ag) <- c("Base Case", "Intervention")
   
-  total_results_Ag[1,] <- results_base_a[1,] # + results_base_p[1,]
-  total_results_Ag[2,] <- results_interv_a[1,] # + results_interv_p[1,]
+  total_results_Ag[1,] <- results_base_a[1,] # will add + results_base_p[1,] when we have piggies
+  total_results_Ag[2,] <- results_interv_a[1,] # will add + results_interv_p[1,] when we have piggies
   
-  CBR <- incr_benefit_a/incr_cost_a
-  NMB_A <- incr_benefit_a-incr_cost_a # per farm in the population
-  
-  # CBR_p <- incr_benefit_p/incr_cost_p
-  # NMB_A_p <- incr_benefit_p-incr_cost_p # per farm in the population
+  CBR <- incr_benefit_a/incr_cost_a #cost-benefit ratio for the poultry sector
+  NMB_A <- incr_benefit_a-incr_cost_a #net monetary benefit for each chicken farm
 
+  NMB_A_all <- NMB_A*intervention[parameter=="n_farms",value] #net monetary benefit for the entire poultry sector
   
-  NMB_A_all <- NMB_A*intervention[parameter=="n_farms",value]
-  # NMB_A_all <- (NMB_A*intervention[parameter=="n_farms",value]) + (NMB_p*pig[parameter=="n_farms",value])
-  
-  implementation_cost <- intervention[parameter=="admin_cost", value]
+  implementation_cost <- intervention[parameter=="admin_cost", value] #cost to the public sector (implementation, enforcement, etc.)
   
   incr_cost_macro <- implementation_cost + incr_cost_prod - NMB_A_all + incr_cost
   
-  icer_macro <- incr_cost_macro / incr_benefit
+  icer_macro <- incr_cost_macro / incr_benefit #not really using this any more but we keep it in
   
-  net_monetary_gain_macro <- -1 * incr_cost_macro
+  net_monetary_gain_macro <- -1 * incr_cost_macro #net monetary gain for poultry + healthcare + productivity (doesn't include valuation of QALYs)
   
-  NMB_macro <- (incr_benefit * wtp) - (incr_cost_macro)
-
+  NMB_macro <- (incr_benefit * wtp) - (incr_cost_macro) #net monetary gain plus the value of QALYs saved
+  
+  #the final outputs (some, such as macro-level ICER, are not useful)
   outputs <- data.table(incr_cost=incr_cost, incr_benefit=incr_benefit,
                         incr_cost_a=incr_cost_a, incr_benefit_a=incr_benefit_a, 
-                        #incr_benefit_p=incr_benefit_p, incr_cost_p=incr_cost_p, CBR_p=CBR_p, NMB_A_p=NMB_A_p, 
                         NMB_A_all=NMB_A_all,
                         icer=icer, CBR = CBR, NMB_H=NMB_H, NMB_A=NMB_A, icer_prod = icer_prod, 
                         NMB_prod = NMB_prod, net_monetary_gain_macro = net_monetary_gain_macro,
@@ -915,6 +792,17 @@ model <- function(inputs){
 }
 # 
 model(inputs)
+
+
+################################################################################
+#IGNORE THE SENSITIVITY ANALYSIS FOR NOW AS WE HAVE CHANGED THE WAY WE LOOK AT OUTPUTS
+################################################################################
+
+
+
+
+
+
 
 scenario_analysis <- matrix(rep(0), nrow = 2, ncol = 2)
 colnames(scenario_analysis) <- c("Human Capital Approach", "Friction Cost Approach")
@@ -934,31 +822,31 @@ scenario_analysis[2,2] <- as.numeric(model(inputs)[1,12])
 
 write.xlsx(scenario_analysis, "C:/Users/tresc/Desktop/AMR-Model/outputs/Scenario Analysis.xlsx")
 
-##check the cost-effectiveness as a function of intervention cost per chicken
-##and plot the cost-effective space
-inputs2 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
-interv_cost_vector <- c(rep(0,10000))
-wtp_vector <- c(rep(0,10000))
-
-for (i in 1:10000) {
-  inputs2[24,4] <- runif(1,0,2)
-  x <- as.numeric(inputs2[24,4])
-  wtp <- runif(1,0,5000)
-  if(model(inputs2)[1,12] >= 0){
-    interv_cost_vector[i] <- x
-    wtp_vector[i] <- wtp
-  }
-} 
-
-ceplot <- as.data.frame(cbind(interv_cost_vector, wtp_vector))
-
-cost_effective_points <- ggplot(ceplot, aes(x=wtp_vector, y=interv_cost_vector))+
-  geom_point()+
-  xlab("Willingness to Pay for a QALY")+
-  ylab("Intervention Cost per Chickin")+
-  ggtitle("Cost-Effective Plane")
-
-plot(cost_effective_points)
+# ##check the cost-effectiveness as a function of intervention cost per chicken
+# ##and plot the cost-effective space
+# inputs2 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
+# interv_cost_vector <- c(rep(0,10000))
+# wtp_vector <- c(rep(0,10000))
+# 
+# for (i in 1:10000) {
+#   inputs2[24,4] <- runif(1,0,2)
+#   x <- as.numeric(inputs2[24,4])
+#   wtp <- runif(1,0,5000)
+#   if(model(inputs2)[1,12] >= 0){
+#     interv_cost_vector[i] <- x
+#     wtp_vector[i] <- wtp
+#   }
+# } 
+# 
+# ceplot <- as.data.frame(cbind(interv_cost_vector, wtp_vector))
+# 
+# cost_effective_points <- ggplot(ceplot, aes(x=wtp_vector, y=interv_cost_vector))+
+#   geom_point()+
+#   xlab("Willingness to Pay for a QALY")+
+#   ylab("Intervention Cost per Chickin")+
+#   ggtitle("Cost-Effective Plane")
+# 
+# plot(cost_effective_points)
 
 ##create a CEAC using the distributions in our parameter sheet
 
