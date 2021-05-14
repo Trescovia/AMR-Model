@@ -1,0 +1,12 @@
+- files named model_* include codes for the different sub-models at each level
+
+- files named RA_main* include codes that enable running the models step by step for the different scenarios
+
+- files names variable* include parameter definitions for all models in the different scenarios
+- analyse_output is a script that includes functions to generate outputs (graphics and files)
+
+Hope this is not too messy !
+
+Again, the aim was to use a quite generic approach to gather all the components in a single model. 
+All link functions are very basic (and their choice can also be considered arbitrary), 
+a mechanistic approach would certainly do better. Curious of your results!
