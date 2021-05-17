@@ -104,76 +104,6 @@ portion_working <- portion_working_age * 0.98162 * 0.767 #assuming unemployment 
 plot(portion_working)
 
 
-#population and working population from WB projections
-
-##working population
-wb_working_pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Viet Nam Working Population WB.csv")
-
-wb_working_pop <- ts(wb_working_pop$Working.Population, start = 1960, frequency = 1)
-
-plot(wb_working_pop)
-
-arimawb <- auto.arima(wb_working_pop, stepwise = F, approximation = F)
-
-summary(arimawb) #5th degree autoregressive, 2nd degree integration, no moving average component
-
-plot(forecast(arimawb, 17))
-
-forecast(arimawb,17)
-
-working_population <- c(rep(0,47))
-
-for (i in 1:30) {
-  working_population[i] <- wb_working_pop[i + 61] #first value is for 1960, so now working_population[1] is for 2021
-}
-
-working_population[30]
-
-future_wb <- forecast(arimawb,17)
-future_wb$mean[1] #2051 is first year
-
-for (i in 31:47) {
-  working_population[i] <- future_wb$mean[i-30]
-}
-
-working_population ## this one for working population
-
-working_population[3]
-
-##total population
-wb_pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Viet Nam Population WB.csv")
-
-wb_pop <- ts(wb_pop$Population, start = 1960, frequency = 1)
-
-plot(wb_pop)
-
-arimawbpop <- auto.arima(wb_pop, stepwise = F, approximation = F)
-
-summary(arimawbpop) #3rd degree autoregressive, 2nd degree integration, no moving average component
-
-plot(forecast(arimawbpop, 17))
-
-forecast(arimawbpop,17)
-
-wb_population <- c(rep(0,47))
-
-for (i in 1:30) {
-  wb_population[i] <- wb_pop[i + 61] #first value is for 1960, so now wb_population[1] is for 2021
-}
-
-wb_population[30]
-
-future_wb_pop <- forecast(arimawbpop,17)
-future_wb_pop$mean[1] #2051 is first year
-
-for (i in 31:47) {
-  wb_population[i] <- future_wb_pop$mean[i-30]
-}
-
-wb_population #this one for total pop
-
-wb_population[3]
-
 ################################################################################
 
 ###
@@ -195,21 +125,21 @@ wtp <- 2365 ## willingness to pay per QALY gained
 
 #Scenarios
 scenario <- "HCA" #must be "HCA" or "FCA"
-scenario_transmission <- "Tang" #for now, must be "Tang" or "Booton"
+scenario_transmission <- "med" #for now, must be {'hi', 'low', 'med', 'max'}
 scenario_outcomes <- "All" #must be either "Enterobacteria" or "All"
 
 ############# model functions
-inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv")
+inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
 
 model <- function(inputs){
   
   inputs[ , value := as.numeric(as.character(value))]
   
-  human <- inputs[scenario=="human_0" | scenario=="human_1"]
-  animal <- inputs[scenario=="animal_0" | scenario=="animal_1"]
+  human <- inputs[scenario=="human"]
+  chicken <- inputs[scenario=="chicken"]
+  pig <- inputs[scenario=="pig"]
   intervention <- inputs[scenario=="intervention"]
-  pig <- inputs[scenario=="pig_0" | scenario == "pig_1"]
   
   
   ##### functions used across the sectors##########
@@ -477,41 +407,47 @@ model <- function(inputs){
     }
   } 
   
-  ###################*****ANIMAL MODEL*****###########################
+  ###################*****CHICKEN MODEL*****###########################
   
   #in this model, we assume that all animals are born on the farm. This will make 
   #no difference on aggregate, as the income from selling chicks is by necessity
-  #equal to the expense of buying them
+  #equal to the expense of buying them. In future, we could incorporate this as well,
+  #and make it so that a farm experiencing negative profits will disappear
   
-  state_names_a <- c("well", "res","sus","fallen","sold") ## the compartments
-  transition_names_a  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s","w_sold")  ## the rates
-  parameter_names_a <- c(state_names_a, transition_names_a)
+  state_names_c <- c("well", "res","sus","fallen","sold") ## the compartments
+  transition_names_c  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s","w_sold")  ## the rates
+  parameter_names_c <- c(state_names_c, transition_names_c)
   
-  state_i_a <- c(intervention[parameter=="n_animals",value], rep(0,length=length(state_names_a)-1))
+  state_i_c <- c(chicken[parameter=="n_animals",value], rep(0,length=length(state_names_c)-1))
   
-  m_param_a_base <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
-  colnames(m_param_a_base) <- parameter_names_a
-  rownames(m_param_a_base) <- paste("cycle", 0:(n.t-1), sep  =  "")
-  
-  m_param_a_base[ , "r"] <- rep(animal[parameter=="well_r",value], n.t)
-  m_param_a_base[ , "s"] <- rep(animal[parameter=="well_s",value], n.t)
-  m_param_a_base[ , "mort_s"] <- rep(animal[parameter=="s_dead",value], n.t)
-  m_param_a_base[ , "mort_r"] <- rep(animal[parameter=="r_dead",value], n.t)
-  m_param_a_base[ , "rec_r"] <- rep(1-(m_param_a_base[1,"mort_r"]), n.t)
-  m_param_a_base[ , "rec_s"] <- rep(1-(m_param_a_base[1,"mort_s"]), n.t)
-  m_param_a_base[ , "birth"] <- rep(animal[parameter=="birth_well",value], n.t)
-  m_param_a_base[ , "mort_w"] <- rep(animal[parameter=="well_dead",value], n.t)
-  m_param_a_base[ , "w_sold"] <- rep(1, n.t) 
+  m_param_c_base <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
+  colnames(m_param_c_base) <- parameter_names_c
+  rownames(m_param_c_base) <- paste("cycle", 0:(n.t-1), sep  =  "")
+ 
+  #here, we have a set mortality rate for all states - 
+  #it only matters if animals are in 'res' or 'sus' for the purpose of calculating 
+  #the cost of therapeutic treatment
+  #we are able to do this because the trial data only tells us the effect on overall mortality,
+  #which inherently takes into account the portion which develop res and sus infections
+  m_param_c_base[ , "r"] <- rep(chicken[parameter=="well_r",value], n.t)
+  m_param_c_base[ , "s"] <- rep(chicken[parameter=="well_s",value], n.t)
+  m_param_c_base[ , "mort_s"] <- rep(chicken[parameter=="all_dead",value], n.t) 
+  m_param_c_base[ , "mort_r"] <- rep(chicken[parameter=="all_dead",value], n.t)
+  m_param_c_base[ , "rec_r"] <- rep(1-(m_param_c_base[1,"mort_r"]), n.t)
+  m_param_c_base[ , "rec_s"] <- rep(1-(m_param_c_base[1,"mort_s"]), n.t)
+  m_param_c_base[ , "birth"] <- rep(chicken[parameter=="birth_well",value], n.t)
+  m_param_c_base[ , "mort_w"] <- rep(chicken[parameter=="all_dead",value], n.t)
+  m_param_c_base[ , "w_sold"] <- rep(1, n.t) 
   
   #make it so that the total incidence of infections stays the same, and only the
   #portion of them that are resistant changes
   for(i in 1:n.t){
-    m_param_a_base[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a_base[i, "r"]
+    m_param_c_base[i, "s"] <- chicken[parameter=="disease_risk", value] - m_param_c_base[i, "r"]
   }
   
-  m_param_a_base[1, 1:length(state_names_a)] <- state_i_a
+  m_param_c_base[1, 1:length(state_names_c)] <- state_i_c
   
-  f_animal_epi <- function(m_param_a_base, n.t){
+  f_animal_epi <- function(m_param_c_base, n.t){
     ### this has for each cycle;
     ## row 1: all the new animals in well bought
     ## row 2: all the cycle transitions to ill 
@@ -523,91 +459,91 @@ model <- function(inputs){
     
     ## create mini matrix to represent the 4 rows per cycle
     
-    m_param_a_temp <- m_param_a_base[1:4,]
-    rownames(m_param_a_temp) <- NULL ##removing rownames
+    m_param_c_temp <- m_param_c_base[1:4,]
+    rownames(m_param_c_temp) <- NULL ##removing rownames
     
     ### split over time to allow for transition probabilities to sum to 1
     ### first transitions
     i<- 2 ## row 2 definitions ## background mortality happens at beginning of cycle 
-    m_param_a_temp[i,"well"] <- m_param_a_temp[i-1,"well"] -(m_param_a_temp[i-1,"r"]*m_param_a_temp[i-1,"well"]) -
-      (m_param_a_temp[i-1,"s"]*m_param_a_temp[i-1,"well"]) - (m_param_a_temp[i-1,"mort_w"]*m_param_a_temp[i-1,"well"])
-    m_param_a_temp[i,"res"] <- m_param_a_temp[i-1,"res"] + (m_param_a_temp[i-1,"r"]*m_param_a_temp[i-1,"well"]) 
-    m_param_a_temp[i,"sus"] <- m_param_a_temp[i-1,"sus"] + (m_param_a_temp[i-1,"s"]*m_param_a_temp[i-1,"well"])
-    m_param_a_temp[i,"fallen"] <- (m_param_a_temp[i-1,"mort_w"]*m_param_a_temp[i-1,"well"]) 
+    m_param_c_temp[i,"well"] <- m_param_c_temp[i-1,"well"] -(m_param_c_temp[i-1,"r"]*m_param_c_temp[i-1,"well"]) -
+      (m_param_c_temp[i-1,"s"]*m_param_c_temp[i-1,"well"]) - (m_param_c_temp[i-1,"mort_w"]*m_param_c_temp[i-1,"well"])
+    m_param_c_temp[i,"res"] <- m_param_c_temp[i-1,"res"] + (m_param_c_temp[i-1,"r"]*m_param_c_temp[i-1,"well"]) 
+    m_param_c_temp[i,"sus"] <- m_param_c_temp[i-1,"sus"] + (m_param_c_temp[i-1,"s"]*m_param_c_temp[i-1,"well"])
+    m_param_c_temp[i,"fallen"] <- (m_param_c_temp[i-1,"mort_w"]*m_param_c_temp[i-1,"well"]) 
     
     i <- 3 ###
-    m_param_a_temp[i,"well"] <-  m_param_a_temp[i-1,"well"]+(m_param_a_temp[i-1,"rec_r"]*m_param_a_temp[i-1,"res"])+ 
-      (m_param_a_temp[i-1,"rec_s"]*m_param_a_temp[i-1,"sus"])
-    m_param_a_temp[i,"res"] <- m_param_a_temp[i-1,"res"] -  (m_param_a_temp[i-1,"mort_r"]*m_param_a_temp[i-1,"res"]) -
-      (m_param_a_temp[i-1,"rec_r"]*m_param_a_temp[i-1,"res"])
-    m_param_a_temp[i,"sus"] <- m_param_a_temp[i-1,"sus"] - 
-      (m_param_a_temp[i-1,"mort_s"]*m_param_a_temp[i-1,"sus"]) - (m_param_a_temp[i-1,"rec_s"]*m_param_a_temp[i-1,"sus"])
-    m_param_a_temp[i,"fallen"] <- (m_param_a_temp[i-1,"mort_r"]*m_param_a_temp[i-1,"res"]) + 
-      (m_param_a_temp[i-1,"mort_s"]*m_param_a_temp[i-1,"sus"]) ## didn't include previous number in fallen as want to sum
+    m_param_c_temp[i,"well"] <-  m_param_c_temp[i-1,"well"]+(m_param_c_temp[i-1,"rec_r"]*m_param_c_temp[i-1,"res"])+ 
+      (m_param_c_temp[i-1,"rec_s"]*m_param_c_temp[i-1,"sus"])
+    m_param_c_temp[i,"res"] <- m_param_c_temp[i-1,"res"] -  (m_param_c_temp[i-1,"mort_r"]*m_param_c_temp[i-1,"res"]) -
+      (m_param_c_temp[i-1,"rec_r"]*m_param_c_temp[i-1,"res"])
+    m_param_c_temp[i,"sus"] <- m_param_c_temp[i-1,"sus"] - 
+      (m_param_c_temp[i-1,"mort_s"]*m_param_c_temp[i-1,"sus"]) - (m_param_c_temp[i-1,"rec_s"]*m_param_c_temp[i-1,"sus"])
+    m_param_c_temp[i,"fallen"] <- (m_param_c_temp[i-1,"mort_r"]*m_param_c_temp[i-1,"res"]) + 
+      (m_param_c_temp[i-1,"mort_s"]*m_param_c_temp[i-1,"sus"]) ## didn't include previous number in fallen as want to sum
     # so avoids double counting
     
     i <-4 ## moving to sold/not-sold states
-    m_param_a_temp[i,"sold"] <- (m_param_a_temp[i-1,"w_sold"]*m_param_a_temp[i-1,"well"])
+    m_param_c_temp[i,"sold"] <- (m_param_c_temp[i-1,"w_sold"]*m_param_c_temp[i-1,"well"])
     
     ### aggregate
-    m_a_sum <- colSums(m_param_a_temp) ## sum over the 4 rows
-    m_a_sum[1] <- state_i_a[1] ## reset Well sum (as this is the only one currently double counting..hopefully)
+    m_c_sum <- colSums(m_param_c_temp) ## sum over the 4 rows
+    m_c_sum[1] <- state_i_c[1] ## reset Well sum (as this is the only one currently double counting..hopefully)
     
-    m_a_sum <- animal[parameter=="annual_cycles",value] * m_a_sum #multiply by the number of annual cycles
+    m_c_sum <- chicken[parameter=="annual_cycles",value] * m_c_sum #multiply by the number of annual cycles
     
     #repeat to get all cycles - in this branch, the animal production side is the same in every year
     #and nothing changes
-    m_param_a <- matrix(rep(m_a_sum), nrow=n.t, ncol =length(parameter_names_a))
-    m_param_a <- t(replicate(n.t,m_a_sum))
-    colnames(m_param_a) <- parameter_names_a
-    rownames(m_param_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
+    m_param_c <- matrix(rep(m_c_sum), nrow=n.t, ncol =length(parameter_names_c))
+    m_param_c <- t(replicate(n.t,m_c_sum))
+    colnames(m_param_c) <- parameter_names_c
+    rownames(m_param_c) <- paste("cycle", 0:(n.t-1), sep  =  "")
     
-    return(m_param_a)
+    return(m_param_c)
     
   }
   
   #apply the animal epi function:
-  m_param_a <- f_animal_epi(m_param_a_base,n.t)
+  m_param_c <- f_animal_epi(m_param_c_base,n.t)
   ### ignore totals of transition probs etc. as they are over counted etc.
   ## just want to focus on health state totals
   
   #### farm cost ###########
-  m_cost_a <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
-  colnames(m_cost_a) <- parameter_names_a
-  rownames(m_cost_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  m_cost_c <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
+  colnames(m_cost_c) <- parameter_names_c
+  rownames(m_cost_c) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
-  c_w <- animal[parameter=="c_animal",value] ## defining cost of keeping the animal
-  c_s <- animal[parameter=="s_cost",value] ## defining cost of treating infections
-  c_r <- animal[parameter=="r_cost",value]
+  c_w <- chicken[parameter=="c_animal",value] ## defining cost of keeping the animal
+  c_s <- chicken[parameter=="s_cost",value] ## defining cost of treating infections
+  c_r <- chicken[parameter=="r_cost",value]
   
-  cost_i_a <- c(c_w,c_w + c_r,c_w + c_s,0,0) #the farm still pays upkeep for sick animals
+  cost_i_c <- c(c_w,c_w + c_r,c_w + c_s,0,0) #the farm still pays upkeep for sick animals
   
   ## start at cycle 1 so you do not multiply initial state vector 
-  m_cost_a[2, 1:length(state_names_a)] <- cost_i_a 
+  m_cost_c[2, 1:length(state_names_c)] <- cost_i_c 
   
   #discount the farm costs
-  for (j in 1:length(state_names_a)) {
+  for (j in 1:length(state_names_c)) {
     for (i in 3:(n.t)){
-      m_cost_a[i,j] <- f_di(m_cost_a[i-1,j],dr)
+      m_cost_c[i,j] <- f_di(m_cost_c[i-1,j],dr)
     }  
   }
   
   #### farm rewards ##################
-  m_rwd_a <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
-  colnames(m_rwd_a) <- parameter_names_a
-  rownames(m_rwd_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  m_rwd_c <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
+  colnames(m_rwd_c) <- parameter_names_c
+  rownames(m_rwd_c) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
   #only get a reward for selling animals
-  r_sold <- animal[parameter=="i_animal",value] ## defining the income from a sold animal
-  rwd_i_a <- c(0,0,0,0,r_sold)
+  r_sold <- chicken[parameter=="i_animal",value] ## defining the income from a sold animal
+  rwd_i_c <- c(0,0,0,0,r_sold)
   
   ## start at cycle 1 so you do not multiply initial state vector 
-  m_rwd_a[2, 1:length(state_names_a)] <- rwd_i_a
+  m_rwd_c[2, 1:length(state_names_c)] <- rwd_i_c
   
   #discount
-  for (j in 1:length(state_names_a)) {
+  for (j in 1:length(state_names_c)) {
     for (i in 3:(n.t)){
-      m_rwd_a[i,j] <- f_di(m_rwd_a[i-1,j],dr)
+      m_rwd_c[i,j] <- f_di(m_rwd_c[i-1,j],dr)
     }  
   }
   ##############################################################################
@@ -619,11 +555,17 @@ model <- function(inputs){
   m_param2 <- m_param ## parameter matrix for scenario 2
   
   #reduce the chance of getting a resistant infection in humans, depending on the link parameter used
-  if(scenario_transmission == "Tang"){
-    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH",value]),
+  if(scenario_transmission == "low"){
+    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH_low",value]),
                             n.t)
-  } else if(scenario_transmission == "Booton"){
-    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH_Booton",value]),
+  } else if(scenario_transmission == "med"){
+    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH_med",value]),
+                            n.t)
+  } else if(scenario_transmission == "hi"){
+    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH_hi",value]),
+                            n.t)
+  } else if(scenario_transmission == "max"){
+    m_param2[ , "r"] <- rep(tuning*human[parameter=="well_r",value]-(tuning*human[parameter=="well_r",value]*intervention[parameter=="u_RH_max",value]),
                             n.t)
   } else{
     paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON HUMAN AMR")
@@ -643,67 +585,70 @@ model <- function(inputs){
   
   m_param2 <- f_human_epi(m_param2, n.t) #apply the human epi function to the intervention case
   
-  ## animals
-  m_param_a2 <- m_param_a_base #create an animal parameter spreadsheet for the intervention case
+  ## chickens
+  m_param_c2 <- m_param_c_base #create an animal parameter spreadsheet for the intervention case
   
-  #reduce the prevalence of resistant infections in animals, according to the link parameter being used
-  if(scenario_transmission == "Tang"){
-    m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA",value]),
-                              n.t)
-  } else if(scenario_transmission == "Booton"){
-    m_param_a2[ , "r"] <- rep(animal[parameter=="well_r",value]-(animal[parameter=="well_r",value]*intervention[parameter=="u_RA_Booton",value]),
-                              n.t)
-  } else{
-    paste("ERROR: PLEASE CHOOSE AN APPROACH TO ESTIMATING THE EFFECT ON ANIMAL AMR")
-  }
+  #change in chicken mortality
+  m_param_c2[ , "mort_W"] <- rep(chicken[parameter=="all_dead", value] + (chicken[parameter=="all_dead", value]*intervention[parameter=="chicken_mort_effect", value]), 
+                                 n.t)
+  
+  m_param_c2[ , "mort_s"] <- rep(chicken[parameter=="all_dead", value] + (chicken[parameter=="all_dead", value]*intervention[parameter=="chicken_mort_effect", value]), 
+                                 n.t)
+  
+  m_param_c2[ , "mort_r"] <- rep(chicken[parameter=="all_dead", value] + (chicken[parameter=="all_dead", value]*intervention[parameter=="chicken_mort_effect", value]), 
+                                 n.t)
+  
+  #change in chicken income (due to bodyweight)
+  
+  m_param_c2[ , "i_animal"] <- rep(chicken[parameter=="i_animal", value] + (chicken[parameter=="i_animal", value]*intervention[parameter=="chicken_income_effect"]),
+                                   n.t)
   
   #make sure the total number of infections stays constant
   for(i in 1:n.t){
-    m_param_a2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_a2[i, "r"]
+    m_param_c2[i, "s"] <- animal[parameter=="disease_risk", value] - m_param_c2[i, "r"]
   }
   
-  m_param_a2[ , 1:length(state_names_a)] <- 0
-  m_param_a2[1, 1:length(state_names_a)] <- state_i_a
+  m_param_c2[ , 1:length(state_names_c)] <- 0
+  m_param_c2[1, 1:length(state_names_c)] <- state_i_c
   
   #apply the animal epi function to the intervention case parameter spreadsheet
-  m_param_a2 <- f_animal_epi(m_param_a2, n.t) 
+  m_param_c2 <- f_animal_epi(m_param_c2, n.t) 
   
   #rewards
-  m_rwd_a2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
-  colnames(m_rwd_a2) <- parameter_names_a
-  rownames(m_rwd_a2) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  m_rwd_c2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
+  colnames(m_rwd_c2) <- parameter_names_c
+  rownames(m_rwd_c2) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
-  r_sold_2 <- (animal[parameter=="i_animal",value])*(1+intervention[parameter=="chicken_income_effect", value]) 
-  rwd_i_a2 <- c(0,0,0,0,r_sold_2)
+  r_sold_2 <- (chicken[parameter=="i_animal",value])*(1+intervention[parameter=="chicken_income_effect", value]) 
+  rwd_i_c2 <- c(0,0,0,0,r_sold_2)
   
   ## start at cycle 1 so you do not multiply initial state vector 
-  m_rwd_a2[2, 1:length(state_names_a)] <- rwd_i_a2
+  m_rwd_c2[2, 1:length(state_names_c)] <- rwd_i_c2
   
   #discount
-  for (j in 1:length(state_names_a)) {
+  for (j in 1:length(state_names_c)) {
     for (i in 3:(n.t)){
-      m_rwd_a2[i,j] <- f_di(m_rwd_a2[i-1,j],dr)
+      m_rwd_c2[i,j] <- f_di(m_rwd_c2[i-1,j],dr)
     }  
   }
   
   #costs
-  m_cost_a2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_a))
-  colnames(m_cost_a) <- parameter_names_a
-  rownames(m_cost_a) <- paste("cycle", 0:(n.t-1), sep  =  "")
+  m_cost_c2 <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
+  colnames(m_cost_c) <- parameter_names_c
+  rownames(m_cost_c) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
-  c_s <- animal[parameter=="s_cost",value]
-  c_r <- animal[parameter=="r_cost",value] #removed double-paying 
-  #c_interv <- intervention[parameter=="int_cost_per",value] #commented out as the farm-level economic effect now manifests itself in the rewards
+  c_s <- chicken[parameter=="s_cost",value]
+  c_r <- chicken[parameter=="r_cost",value] #removed double-paying 
   
-  cost_i_a2 <- c(c_w, c_w + c_r,c_w + c_s,0,0) #you still pay upkeep on animals who are treated or infected
+  cost_i_c2 <- c(c_w, c_w + c_r,c_w + c_s,0,0) #you still pay upkeep on animals who are treated or infected
   
   ## start at cycle 1 so you do not multiply initial state vector
-  m_cost_a2[2, 1:length(state_names_a)] <- cost_i_a2
+  m_cost_c2[2, 1:length(state_names_c)] <- cost_i_c2
   
   #discount
-  for (j in 1:length(state_names_a)) {
+  for (j in 1:length(state_names_c)) {
     for (i in 3:(n.t)){
-      m_cost_a2[i,j] <- f_di(m_cost_a2[i-1,j],dr)
+      m_cost_c2[i,j] <- f_di(m_cost_c2[i-1,j],dr)
     }
   }
   
@@ -711,9 +656,9 @@ model <- function(inputs){
   
   #get a results matrix for healthcare and chickens
   results_base_h <- f_expvalue(m_param,m_cost,m_rwd)
-  results_base_a <- f_expvalue(m_param_a,m_cost_a,m_rwd_a)
+  results_base_c <- f_expvalue(m_param_c,m_cost_c,m_rwd_c)
   results_interv_h <- f_expvalue(m_param2,m_cost,m_rwd)
-  results_interv_a <- f_expvalue(m_param_a2,m_cost_a2,m_rwd_a2)
+  results_interv_c <- f_expvalue(m_param_c2,m_cost_c2,m_rwd_c2)
   
   total_results_HC<- matrix(rep(0), nrow=2, ncol=2)
   colnames(total_results_HC) <- c("Costs (£)", "QALYs")
@@ -752,23 +697,31 @@ model <- function(inputs){
   icer_prod <- incr_cost_prod/incr_benefit_prod #hopefully negative, if intervention improves productivity and saves QALYs
   NMB_prod <- total_results_prod[2,1] - total_results_prod[1,1] #hopefully positive
   
-  ## Farm level
-  incr_cost_a <- (results_interv_a[1,1] - results_base_a[1,1])
-  incr_benefit_a <-  (results_interv_a[1,2]-results_base_a[1,2])
+  ## Farm level (chickens)
+  incr_cost_c <- (results_interv_c[1,1] - results_base_c[1,1])
+  incr_benefit_c <-  (results_interv_c[1,2]-results_base_c[1,2])
   
-  total_results_Ag<- matrix(rep(0), nrow=2, ncol=2)
-  colnames(total_results_Ag) <- c("Costs (£)", "Benefits (£)")
+  total_results_Ag_c<- matrix(rep(0), nrow=2, ncol=2)
+  colnames(total_results_Ag_c) <- c("Costs (£)", "Benefits (£)")
   rownames(total_results_Ag) <- c("Base Case", "Intervention")
   
-  total_results_Ag[1,] <- results_base_a[1,] # will add + results_base_p[1,] when we have piggies
-  total_results_Ag[2,] <- results_interv_a[1,] # will add + results_interv_p[1,] when we have piggies
+  total_results_Ag_c[1,] <- results_base_c[1,] # will add + results_base_p[1,] when we have piggies
+  total_results_Ag_c[2,] <- results_interv_c[1,] # will add + results_interv_p[1,] when we have piggies
   
   CBR <- incr_benefit_a/incr_cost_a #cost-benefit ratio for the poultry sector
   NMB_A <- incr_benefit_a-incr_cost_a #net monetary benefit for each chicken farm
   
   NMB_A_all <- NMB_A*intervention[parameter=="n_farms",value] #net monetary benefit for the entire poultry sector
   
-  implementation_cost <- intervention[parameter=="admin_cost", value] #cost to the public sector (implementation, enforcement, etc.)
+  intervention_cost_year <- intervention[parameter=="farm_int_cost", value]
+  dr_int_pgrowth <- dr - human[parameter=="prod_growth", value] ##discount rate net of productivity growth, as we assume that compensation for vet and farmer time increases to reflect wage growth
+  int_cost_vector <- rep(0, n.t)
+  for(i in 1:n.t){
+    int_cost_vector[i] <- intervention_cost_year*(dr_int_pgrowth^(i-1))
+  }
+  intervention_cost_all <- sum(int_cost_vector)
+  
+  implementation_cost <- intervention[parameter=="admin_cost", value] + intervention_cost_all
   
   incr_cost_macro <- implementation_cost + incr_cost_prod - NMB_A_all + incr_cost
   
@@ -792,493 +745,3 @@ model <- function(inputs){
 }
 # 
 model(inputs)
-
-
-################################################################################
-#IGNORE THE SENSITIVITY ANALYSIS FOR NOW AS WE HAVE CHANGED THE WAY WE LOOK AT OUTPUTS
-################################################################################
-
-
-
-
-
-
-
-scenario_analysis <- matrix(rep(0), nrow = 2, ncol = 2)
-colnames(scenario_analysis) <- c("Human Capital Approach", "Friction Cost Approach")
-rownames(scenario_analysis) <- c("Tang", "Booton")
-
-scenario <- "HCA"
-scenario_transmission <- "Tang"
-scenario_analysis[1,1] <- as.numeric(model(inputs)[1,12])
-scenario_transmission <- "Booton"
-scenario_analysis[2,1] <- as.numeric(model(inputs)[1,12])
-
-scenario <- "FCA"
-scenario_transmission <- "Tang"
-scenario_analysis[1,2] <- as.numeric(model(inputs)[1,12])
-scenario_transmission <- "Booton"
-scenario_analysis[2,2] <- as.numeric(model(inputs)[1,12])
-
-write.xlsx(scenario_analysis, "C:/Users/tresc/Desktop/AMR-Model/outputs/Scenario Analysis.xlsx")
-
-# ##check the cost-effectiveness as a function of intervention cost per chicken
-# ##and plot the cost-effective space
-# inputs2 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
-# interv_cost_vector <- c(rep(0,10000))
-# wtp_vector <- c(rep(0,10000))
-# 
-# for (i in 1:10000) {
-#   inputs2[24,4] <- runif(1,0,2)
-#   x <- as.numeric(inputs2[24,4])
-#   wtp <- runif(1,0,5000)
-#   if(model(inputs2)[1,12] >= 0){
-#     interv_cost_vector[i] <- x
-#     wtp_vector[i] <- wtp
-#   }
-# } 
-# 
-# ceplot <- as.data.frame(cbind(interv_cost_vector, wtp_vector))
-# 
-# cost_effective_points <- ggplot(ceplot, aes(x=wtp_vector, y=interv_cost_vector))+
-#   geom_point()+
-#   xlab("Willingness to Pay for a QALY")+
-#   ylab("Intervention Cost per Chickin")+
-#   ggtitle("Cost-Effective Plane")
-# 
-# plot(cost_effective_points)
-
-##create a CEAC using the distributions in our parameter sheet
-
-inputs3 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
-ceac_icer_vector <- c(rep(0,1000))
-
-for(i in 1:1000){
-  
-  #load dataset
-  inputs3 <- as.data.table(read.csv("C:/Users/tresc/Desktop/AMR-Model/input_V.csv"))
-  
-  #random draws of normally distributed variables
-  inputs3[13,4] <- rnorm(1,as.numeric(inputs3[13,4]),as.numeric((inputs3[13,4] - inputs3[13,6])/1.96))
-  inputs3[18,4] <- rnorm(1,as.numeric(inputs3[18,4]),as.numeric((inputs3[18,4] - inputs3[18,6])/1.96))
-  inputs3[33,4] <- rnorm(1,as.numeric(inputs3[33,4]),as.numeric((inputs3[33,4] - inputs3[33,6])/1.96))
-  
-  #random draws of uniformly distributed variables
-  inputs3[22,4] <- runif(1,as.numeric(inputs3[22,6]),as.numeric(inputs3[22,7]))
-  inputs3[24,4] <- runif(1,as.numeric(inputs3[24,6]),as.numeric(inputs3[24,7]))
-  
-  #random draws of the beta-distributed variables
-  inputs3[5,4] <- rbeta(1,as.numeric(inputs3[5,6]),as.numeric(inputs3[5,7]))
-  inputs3[6,4] <- rbeta(1,as.numeric(inputs3[6,6]),as.numeric(inputs3[6,7]))
-  inputs3[15,4] <- rbeta(1,as.numeric(inputs3[15,6]),as.numeric(inputs3[15,7]))
-  inputs3[16,4] <- rbeta(1,as.numeric(inputs3[16,6]),as.numeric(inputs3[16,7]))
-  inputs3[19,4] <- rbeta(1,as.numeric(inputs3[19,6]),as.numeric(inputs3[19,7]))
-  inputs3[20,4] <- rbeta(1,as.numeric(inputs3[20,6]),as.numeric(inputs3[20,7]))
-  inputs3[25,4] <- rbeta(1,as.numeric(inputs3[25,6]),as.numeric(inputs3[25,7]))
-  inputs3[26,4] <- rbeta(1,as.numeric(inputs3[26,6]),as.numeric(inputs3[26,7]))
-  
-  #create a vector of ICER values
-  ceac_icer_vector[i] <- as.data.frame(model(inputs3))[1,13]
-}
-
-#create and plot the CEAC
-density <- ecdf(ceac_icer_vector)
-CEAC <- plot(density,
-             xlim = c(0,10000),
-             xlab = 'Willingness to Pay per QALY',
-             ylab = "Portion of Interventions Cost-Effective",
-             main = 'Cost Effectiveness Acceptability Curve')
-abline(v = c(200,3000), col = c("blue", "red"), lty = c(2,2), lwd = c(2,2)) 
-
-#tornado plot
-#get base case NMB
-tornado_base <- as.data.frame(model(inputs))[1,12]
-
-#prod growth
-inputstornado <- inputs 
-inputstornado[33,4] <- inputs[33,6]
-prod_growth_low <- as.data.frame(model(inputstornado))[1,12]
-prod_growth_low <- prod_growth_low - tornado_base
-inputstornado[33,4] <- inputs[33,7]
-prod_growth_high <- as.data.frame(model(inputstornado))[1,12]
-prod_growth_high <- prod_growth_high - tornado_base
-
-#reduction in animal resistance
-inputstornado <- inputs
-inputstornado[26,4] <- inputs[26,6]
-u_RA_low <- as.data.frame(model(inputstornado))[1,12]
-u_RA_low <- u_RA_low - tornado_base
-inputstornado[26,4] <- inputs[26,7]
-u_RA_high <- as.data.frame(model(inputstornado))[1,12]
-u_RA_high <- u_RA_high - tornado_base
-
-#reduction in human resistance
-inputstornado <- inputs
-inputstornado[25,4] <- inputs[25,6]
-u_RH_low <- as.data.frame(model(inputstornado))[1,12]
-u_RH_low <- u_RH_low - tornado_base
-inputstornado[25,4] <- inputs[25,7]
-u_RH_high <- as.data.frame(model(inputstornado))[1,12]
-u_RH_high <- u_RH_high - tornado_base
-
-#intervention cost per chicken
-inputstornado <- inputs
-inputstornado[24,4] <- inputs[24,6]
-int_cost_low <- as.data.frame(model(inputstornado))[1,12]
-int_cost_low <- int_cost_low - tornado_base
-inputstornado[24,4] <- inputs[24,7]
-int_cost_high <- as.data.frame(model(inputstornado))[1,12]
-int_cost_high <- int_cost_high - tornado_base
-
-#cost of treating a resistant infection in animals
-inputstornado <- inputs
-inputstornado[22,4] <- inputs[22,6]
-res_treat_a_low <- as.data.frame(model(inputstornado))[1,12]
-res_treat_a_low <- res_treat_a_low - tornado_base
-inputstornado[22,4] <- inputs[22,7]
-res_treat_a_high <- as.data.frame(model(inputstornado))[1,12]
-res_treat_a_high <- res_treat_a_high - tornado_base
-
-#cost of treating a susceptible infection in animals
-inputstornado <- inputs
-inputstornado[21,4] <- inputs[21,6]
-sus_treat_a_low <- as.data.frame(model(inputstornado))[1,12]
-sus_treat_a_low <- sus_treat_a_low - tornado_base
-inputstornado[21,4] <- inputs[21,7]
-sus_treat_a_high <- as.data.frame(model(inputstornado))[1,12]
-sus_treat_a_high <- sus_treat_a_high - tornado_base
-
-#animal mortality from resistant infection
-inputstornado <- inputs
-inputstornado[20,4] <- inputs[20,6]
-res_mort_a_low <- as.data.frame(model(inputstornado))[1,12]
-res_mort_a_low <- res_mort_a_low - tornado_base
-inputstornado[20,4] <- inputs[20,7]
-res_mort_a_high <- as.data.frame(model(inputstornado))[1,12] 
-res_mort_a_high <- res_mort_a_high - tornado_base
-
-#animal mortality from susceptible infection
-inputstornado <- inputs
-inputstornado[19,4] <- inputs[19,6]
-sus_mort_a_low <- as.data.frame(model(inputstornado))[1,12]
-sus_mort_a_low <- sus_mort_a_low - tornado_base
-inputstornado[19,4] <- inputs[19,7]
-sus_mort_a_high <- as.data.frame(model(inputstornado))[1,12] 
-sus_mort_a_high <- sus_mort_a_high - tornado_base
-
-#income per chicken sold
-inputstornado <- inputs
-inputstornado[18,4] <- inputs[18,6]
-income_chicken_low <- as.data.frame(model(inputstornado))[1,12]
-income_chicken_low <- income_chicken_low - tornado_base
-inputstornado[18,4] <- inputs[18,7]
-income_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
-income_chicken_high <- income_chicken_high - tornado_base
-
-#cost (financial, not emotional) of raising a chicken
-inputstornado <- inputs
-inputstornado[17,4] <- inputs[17,6]
-upkeep_chicken_low <- as.data.frame(model(inputstornado))[1,12]
-upkeep_chicken_low <- upkeep_chicken_low - tornado_base
-inputstornado[17,4] <- inputs[17,7]
-upkeep_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
-upkeep_chicken_high <- upkeep_chicken_high - tornado_base
-
-#probability of an animal getting a susceptible infection
-inputstornado <- inputs
-inputstornado[16,4] <- inputs[16,6]
-sus_chicken_low <- as.data.frame(model(inputstornado))[1,12]
-sus_chicken_low <- sus_chicken_low - tornado_base
-inputstornado[16,4] <- inputs[16,7]
-sus_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
-sus_chicken_high <- sus_chicken_high - tornado_base
-
-#probability of an animal getting a resistant infection
-inputstornado <- inputs
-inputstornado[15,4] <- inputs[15,6]
-res_chicken_low <- as.data.frame(model(inputstornado))[1,12]
-res_chicken_low <- res_chicken_low - tornado_base
-inputstornado[15,4] <- inputs[15,7]
-res_chicken_high <- as.data.frame(model(inputstornado))[1,12] 
-res_chicken_high <- res_chicken_high - tornado_base
-
-#chicken background mortality
-inputstornado <- inputs
-inputstornado[13,4] <- inputs[13,6]
-chicken_mort_low <- as.data.frame(model(inputstornado))[1,12]
-chicken_mort_low <- chicken_mort_low - tornado_base
-inputstornado[13,4] <- inputs[13,7]
-chicken_mort_high <- as.data.frame(model(inputstornado))[1,12] 
-chicken_mort_high <- chicken_mort_high - tornado_base
-
-#hospital cost of treating a resistant infection in humans
-inputstornado <- inputs
-inputstornado[8,4] <- 0.5 * inputs[8,4]
-res_treat_low <- as.data.frame(model(inputstornado))[1,12]
-res_treat_low <- res_treat_low - tornado_base
-inputstornado[8,4] <- 1.5 * inputs[8,4]
-res_treat_high <- as.data.frame(model(inputstornado))[1,12] 
-res_treat_high <- res_treat_high - tornado_base
-
-#hospital cost of treating a susceptible infection in humans
-inputstornado <- inputs
-inputstornado[7,4] <- 0.5 * inputs[7,4]
-sus_treat_low <- as.data.frame(model(inputstornado))[1,12]
-sus_treat_low <- sus_treat_low - tornado_base
-inputstornado[7,4] <- 1.5 * inputs[7,4]
-sus_treat_high <- as.data.frame(model(inputstornado))[1,12] 
-sus_treat_high <- sus_treat_high - tornado_base
-
-#mortality of resistant cases
-inputstornado <- inputs
-inputstornado[6,4] <- 0.5 * inputs[6,4]
-res_mort_low <- as.data.frame(model(inputstornado))[1,12]
-res_mort_low <- res_mort_low - tornado_base
-inputstornado[6,4] <- 1.5 * inputs[6,4]
-res_mort_high <- as.data.frame(model(inputstornado))[1,12]
-res_mort_high <- res_mort_high - tornado_base
-
-#mortality of susceptible cases
-inputstornado <- inputs
-inputstornado[5,4] <- 0.5 * inputs[5,4]
-sus_mort_low <- as.data.frame(model(inputstornado))[1,12]
-sus_mort_low <- sus_mort_low - tornado_base
-inputstornado[5,4] <- 1.5 * inputs[5,4]
-sus_mort_high <- as.data.frame(model(inputstornado))[1,12]
-sus_mort_high <- sus_mort_high - tornado_base
-
-tornado <- data.frame(variable = c("productivity growth",
-                                   "reduction in animal AMR",
-                                   "reduction in human AMR",
-                                   "intervention cost per chicken",
-                                   "cost of treating a resistant infection in chickens",
-                                   "cost of treating a susceptible infection in chickens",
-                                   "chicken mortality from resistant infection",
-                                   "chicken mortality from susceptible infection",
-                                   "income per chicken sold",
-                                   "cost (financial, not emotional) of raising a chicken",
-                                   "probability of a chicken getting a susceptible infection",
-                                   "probability of a chicken getting a resistant infection",
-                                   "chicken background mortality",
-                                   "hospital cost of treating a resistant infection in humans",
-                                   "hospital cost of treating a susceptible infection in humans",
-                                   "mortality of resistant cases",
-                                   "mortality of susceptible cases"),
-                      min = c(prod_growth_low, u_RA_low, u_RH_low, int_cost_low, res_treat_a_low, sus_treat_a_low, 
-                              res_mort_a_low, sus_mort_a_low, income_chicken_low, upkeep_chicken_low, sus_chicken_low, res_chicken_low, 
-                              chicken_mort_low, res_treat_low, sus_treat_low, res_mort_low, sus_mort_low),
-                      max = c(prod_growth_high,u_RA_high, u_RH_high, int_cost_high, res_treat_a_high, sus_treat_a_high,
-                              res_mort_a_high, sus_mort_a_high, income_chicken_high, upkeep_chicken_high, sus_chicken_high, res_chicken_high,
-                              chicken_mort_high, res_treat_high, sus_treat_high, res_mort_high, sus_mort_high))
-
-
-ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
-  geom_linerange(size = 10) +
-  coord_flip() +
-  xlab("") +
-  ggtitle("Change in Macro-Level Net Monetary Benefit along Range of Each Parameter")+
-  geom_hline(yintercept = 0, linetype = "dotted") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15))
-
-################################################################################
-############################exploring discount rates############################
-################################################################################
-model(inputs)
-dr <- 0.094
-model(inputs) #becomes significantly less cost-effective with a higher discount rate
-dr <- 0.035
-
-dr_vector <- as.vector(seq(from = 0, to = 0.12, by = 0.0001))
-dr_NMB <- as.vector(rep(0,1201))
-
-for(i in 1:1201){
-  dr <- dr_vector[i]
-  dr_NMB[i] <- as.data.frame(model(inputs))[1,12]
-}
-
-dr_df <- as.data.frame(cbind(dr_vector, dr_NMB))
-colnames(dr_df) <- c("Discount Rate", "Macro-Level NMB")
-
-plot(dr_df$`Discount Rate`, dr_df$`Macro-Level NMB`)
-
-ggplot(dr_df, aes(x=dr_vector, y=dr_NMB)) +
-  geom_point()+
-  geom_vline(xintercept = 0.03, linetype = "dotted")+
-  geom_vline(xintercept = 0.066, lty = "dashed")+
-  geom_vline(xintercept = 0.094)+
-  ggtitle("Macro-Level NMB at Different Levels of the Discount Rate")+
-  labs(title = "Macro-Level NMB at Different Levels of the Discount Rate", x = "Intertemporal Discount Rate", y = "Macro-Level NMB")
-
-################################################################################
-############################exploring farm costs################################
-################################################################################
-
-cost_vector <- as.vector(seq(from = -0.05, to = 0.15, by = 0.0001))
-cost_icer <- as.vector(rep(0,2001))
-
-inputs_cost <- inputs 
-
-for(i in 1:1201){
-  inputs_cost[24,4] <- cost_vector[i]
-  cost_NMB[i] <- as.data.frame(model(inputs_cost))[1,12]
-  inputs_cost <- inputs 
-}
-
-cost_df <- as.data.frame(cbind(cost_vector, cost_NMB))
-colnames(cost_df) <- c("Cost per Chicken", "Macro-Level NMB")
-
-plot(cost_df$`Cost per Chicken`, cost_df$`Macro-Level NMB`)
-
-ggplot(cost_df, aes(x=cost_vector, y=cost_NMB)) +
-  geom_point()+
-  geom_vline(xintercept = 0, linetype = "dashed", lwd = 1, col = "red")+
-  #geom_vline(xintercept = 0.02173, linetype = "dashed", lwd = 1, col = "blue")+
-  geom_vline(xintercept = 0.022205, linetype = "dashed", lwd = 1, col = "blue")+
-  labs(title = "Macro-Level NMB at Different Levels of Intervention Cost", 
-       x = "Intervention Cost per Chicken", y = "Macro-Level NMB", 
-       subtitle = "Red: NMB at Zero Net Cost, Blue: NMB at Cost-Effective Threshold (0.022205 USD)")
-
-################################################################################
-################################################################################
-
-#Partial Rank Correlation Coefficient
-#parameters to vary: same as in CEAC, but now add discount rate
-prcc_df <- data.table()
-
-prcc_df$a_mort <- rep(0,10000)
-prcc_df$a_inc <- rep(0,10000)
-prcc_df$prod_growth <- rep(0,10000)
-prcc_df$a_res_cost <- rep(0,10000)
-prcc_df$a_int_cost <- rep(0,10000)
-prcc_df$h_res_mort <- rep(0,10000)
-prcc_df$h_sus_mort <- rep(0,10000)
-prcc_df$a_res_prob <- rep(0,10000)
-prcc_df$a_sus_prob <- rep(0,10000)
-prcc_df$a_res_mort <- rep(0,10000)
-prcc_df$a_sus_mort <- rep(0,10000)
-prcc_df$h_amr_fall <- rep(0,10000)
-prcc_df$a_amr_fall <- rep(0,10000)
-prcc_df$dr <- rep(0,10000)
-prcc_df$NMB <- rep(0,10000)
-
-inputs_prcc <- inputs
-
-set.seed(42069)
-
-for(i in 1:10000){
-  inputs_prcc[13,4] <- rnorm(1,as.numeric(inputs_prcc[13,4]),as.numeric((inputs_prcc[13,4] - inputs_prcc[13,6])/1.96)) #animal on-farm mortality
-  inputs_prcc[18,4] <- rnorm(1,as.numeric(inputs_prcc[18,4]),as.numeric((inputs_prcc[18,4] - inputs_prcc[18,6])/1.96)) #income per animal
-  inputs_prcc[33,4] <- rnorm(1,as.numeric(inputs_prcc[33,4]),as.numeric((inputs_prcc[33,4] - inputs_prcc[33,6])/1.96)) #productivity growth
-  
-  #random draws of uniformly distributed variables
-  inputs_prcc[22,4] <- runif(1,as.numeric(inputs_prcc[22,6]),as.numeric(inputs_prcc[22,7])) #cost of treating a resistant infection in animals
-  inputs_prcc[24,4] <- runif(1,as.numeric(inputs_prcc[24,6]),as.numeric(inputs_prcc[24,7])) #intervention cost per animal
-  
-  #random draws of the beta-distributed variables
-  inputs_prcc[5,4] <- rbeta(1,as.numeric(inputs_prcc[5,6]),as.numeric(inputs_prcc[5,7])) #human mortality from resistant infection
-  inputs_prcc[6,4] <- rbeta(1,as.numeric(inputs_prcc[6,6]),as.numeric(inputs_prcc[6,7])) #human mortality from susceptible infection
-  inputs_prcc[15,4] <- rbeta(1,as.numeric(inputs_prcc[15,6]),as.numeric(inputs_prcc[15,7])) #animal probability of resistant infection
-  inputs_prcc[16,4] <- rbeta(1,as.numeric(inputs_prcc[16,6]),as.numeric(inputs_prcc[16,7])) #animal probability of susceptible infection
-  inputs_prcc[19,4] <- rbeta(1,as.numeric(inputs_prcc[19,6]),as.numeric(inputs_prcc[19,7])) #animal mortality from susceptible infection
-  inputs_prcc[20,4] <- rbeta(1,as.numeric(inputs_prcc[20,6]),as.numeric(inputs_prcc[20,7])) #animal mortality from resistant infection
-  inputs_prcc[25,4] <- rbeta(1,as.numeric(inputs_prcc[25,6]),as.numeric(inputs_prcc[25,7])) #intervention reduction in human AMR
-  inputs_prcc[26,4] <- rbeta(1,as.numeric(inputs_prcc[26,6]),as.numeric(inputs_prcc[26,7])) #intervention reduction in animal AMR
-  
-  #randonly draw the discount rate
-  dr <- rtriang(1, a = 0, b = 10, c = 8)
-  
-  prcc_df$a_mort[i] <- inputs_prcc[13,4]
-  prcc_df$a_inc[i] <- inputs_prcc[18,4]
-  prcc_df$prod_growth[i] <- inputs_prcc[33,4]
-  prcc_df$a_res_cost[i] <- inputs_prcc[22,4]
-  prcc_df$a_int_cost[i] <- inputs_prcc[24,4]
-  prcc_df$h_res_mort[i] <- inputs_prcc[5,4]
-  prcc_df$h_sus_mort[i] <- inputs_prcc[6,4]
-  prcc_df$a_res_prob[i] <- inputs_prcc[15,4]
-  prcc_df$a_sus_prob[i] <- inputs_prcc[16,4]
-  prcc_df$a_res_mort[i] <- inputs_prcc[19,4]
-  prcc_df$a_sus_mort[i] <- inputs_prcc[20,4]
-  prcc_df$h_amr_fall[i] <- inputs_prcc[25,4]
-  prcc_df$a_amr_fall[i] <- inputs_prcc[26,4]
-  prcc_df$dr[i] <- dr 
-  prcc_df$NMB[i] <- model(inputs_prcc)[1,12]
-  
-  inputs_prcc <- inputs
-  
-  if(i %% 100 == 0){
-    print(i)
-  }
-  
-}
-
-safe <- prcc_df
-
-a_mort <- as.numeric(unlist(safe$a_mort))
-a_inc <- as.numeric(unlist(safe$a_inc))
-prod_growth <- as.numeric(unlist(safe$prod_growth))
-a_res_cost <- as.numeric(unlist(safe$a_res_cost))
-a_int_cost <- as.numeric(unlist(safe$a_int_cost))
-h_res_mort <- as.numeric(unlist(safe$h_res_mort))
-h_sus_mort <- as.numeric(unlist(safe$h_sus_mort))
-a_res_prob <- as.numeric(unlist(safe$a_res_prob))
-a_sus_prob <- as.numeric(unlist(safe$a_sus_prob))
-a_res_mort <- as.numeric(unlist(safe$a_res_mort))
-a_sus_mort <- as.numeric(unlist(safe$a_sus_mort))
-h_amr_fall <- as.numeric(unlist(safe$h_amr_fall))
-a_amr_fall <- as.numeric(unlist(safe$a_amr_fall))
-drr <- as.numeric(unlist(safe$dr))
-NMB <- as.numeric(unlist(safe$NMB))
-
-prcc_dataset <- as.data.frame(cbind(a_mort,a_inc,prod_growth,a_res_cost,a_int_cost,h_res_mort,h_sus_mort,a_res_prob,a_sus_prob,a_res_mort,a_sus_mort,h_amr_fall,a_amr_fall,drr,NMB))
-
-write.csv(prcc_dataset,"C:/Users/tresc/Desktop/AMR-Model/outputs/prcc_data.csv", row.names = F)
-
-#evaluate the monotonicity of the relationships by looking at scatterplots
-
-plot(prcc_dataset$a_mort , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$a_inc, prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$prod_growth , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$a_res_cost , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$a_int_cost , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$h_res_mort , prcc_dataset$NMB) #possible non-monotonicity
-
-plot(prcc_dataset$h_sus_mort , prcc_dataset$NMB) #possible non-monotonicity
-
-plot(prcc_dataset$a_res_prob , prcc_dataset$NMB) #possible non-monotonicity
-
-plot(prcc_dataset$a_sus_prob , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$a_res_mort , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$a_sus_mort , prcc_dataset$NMB) #safe
-
-plot(prcc_dataset$h_amr_fall , prcc_dataset$NMB) #unclear
-
-plot(prcc_dataset$a_amr_fall , prcc_dataset$NMB) #unclear
-
-plot(prcc_dataset$drr , prcc_dataset$NMB) #unclear
-
-id <- seq(from = 1, to = 10000, by = 1)
-
-monotonic_test_dataset <- as.data.frame(cbind(id, prcc_dataset))
-
-#gauge to PRCC
-
-epi.prcc(prcc_dataset, sided.test = 2, conf.level = 0.95)
-#significant values: 5 (animal intervention cost)(+), 7 (human mortality from sus)(-), 8 (animal probability of res)(-), 
-#11 (animal mortality from sus)(-), 12 (fall in human AMR)(-), 13 (fall in animal AMR)(-), 14 (discount rate)(-)
-#some of these don't make sense though --> we saw that a higher discount rate increased the ICER
-#this is probably because PRCC requires a monotonic relationship
-
-epi.prcc(prcc_dataset, sided.test = 1, conf.level = 0.95)
-#in the one-sided test, the significant values are:
-#2(-), 5(+), 7(-), 8(-), 11(-), 12(-), 13(-), 14(-)
-#only difference is that income from animal sale is now significant, and negatively related to ICER (makes sense)
-
-
