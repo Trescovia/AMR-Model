@@ -25,7 +25,7 @@ n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 tstop <- n.t + 3
 dr <- 0.08 ## discount rate
 wtp <- 2365 ## willingness to pay per QALY gained
-emp_rate <- 0.98162
+emp_rate <- 0.98162 
 lfpr <- 0.767
 
 #Scenarios
