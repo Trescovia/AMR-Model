@@ -141,8 +141,6 @@ plot(portion_working)
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
 
-model <- function(inputs){
-  
   inputs[ , value := as.numeric(as.character(value))]
   
   human <- inputs[scenario=="human"]
@@ -169,9 +167,9 @@ model <- function(inputs){
   }
   
   
-
-# Human Epi Model -------------------------------------------------------------
-
+  
+  # Human Epi Model -------------------------------------------------------------
+  
   #for HCA and FCA, we only care about the losses in productivity, so we set the 
   #reward for 'well' to be zero. Going into the 'dead' state incurs a productivity
   #loss equal to the discounted value of future earnings, going into the 'res' or 'sus
@@ -260,10 +258,10 @@ model <- function(inputs){
   
   m_param <- f_human_epi(m_param,n.t) #applying the epi function for humans (base case)
   
-
-# Healthcare Costs --------------------------------------------------------
-
-
+  
+  # Healthcare Costs --------------------------------------------------------
+  
+  
   m_cost <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names))
   colnames(m_cost) <- parameter_names
   rownames(m_cost) <- paste("cycle", 0:(n.t-1), sep  =  "")
@@ -282,10 +280,10 @@ model <- function(inputs){
     }  
   }
   
-
-# Healthcare Rewards ------------------------------------------------------
-
-
+  
+  # Healthcare Rewards ------------------------------------------------------
+  
+  
   m_rwd <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names))
   colnames(m_rwd) <- parameter_names
   rownames(m_rwd) <- paste("cycle", 0:(n.t-1), sep  =  "")
@@ -329,9 +327,9 @@ model <- function(inputs){
     }  
   }
   
-
-
-# Productivity Costs ------------------------------------------------------
+  
+  
+  # Productivity Costs ------------------------------------------------------
   
   #for HCA and FCA, we only care about the losses in productivity, so we set the 
   #reward for 'well' to be zero. Going into the 'dead' state incurs a productivity
@@ -426,10 +424,10 @@ model <- function(inputs){
     }
   } 
   
-
-
-# Chicken Epi Model -----------------------------------------------------------
-
+  
+  
+  # Chicken Epi Model -----------------------------------------------------------
+  
   
   #in this model, we assume that all animals are born on the farm. This will make 
   #no difference on aggregate, as the income from selling chicks is by necessity
@@ -445,7 +443,7 @@ model <- function(inputs){
   m_param_c_base <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
   colnames(m_param_c_base) <- parameter_names_c
   rownames(m_param_c_base) <- paste("cycle", 0:(n.t-1), sep  =  "")
- 
+  
   #here, we have a set mortality rate for all states - 
   #it only matters if animals are in 'res' or 'sus' for the purpose of calculating 
   #the cost of therapeutic treatment
@@ -529,9 +527,9 @@ model <- function(inputs){
   ### ignore totals of transition probs etc. as they are over counted etc.
   ## just want to focus on health state totals
   
-
-# Farm Costs --------------------------------------------------------------
-
+  
+  # Farm Costs --------------------------------------------------------------
+  
   m_cost_c <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
   colnames(m_cost_c) <- parameter_names_c
   rownames(m_cost_c) <- paste("cycle", 0:(n.t-1), sep  =  "")
@@ -552,9 +550,9 @@ model <- function(inputs){
     }  
   }
   
-
-# Farm Rewards ------------------------------------------------------------
-
+  
+  # Farm Rewards ------------------------------------------------------------
+  
   
   m_rwd_c <- matrix(rep(0), nrow=n.t, ncol =length(parameter_names_c))
   colnames(m_rwd_c) <- parameter_names_c
@@ -574,9 +572,9 @@ model <- function(inputs){
     }  
   }
   
-
-# Intervention ------------------------------------------------------------
-
+  
+  # Intervention ------------------------------------------------------------
+  
   
   ### reduction in incidence of drug resistant infections
   ### humans
@@ -627,7 +625,7 @@ model <- function(inputs){
   m_param_c2[ , "mort_r"] <- rep(chicken[parameter=="all_dead", value] + (chicken[parameter=="all_dead", value]*intervention[parameter=="chicken_mort_effect", value]), 
                                  n.t)
   
-
+  
   #make sure the total number of infections stays constant
   for(i in 1:n.t){
     m_param_c2[i, "s"] <- chicken[parameter=="disease_risk", value] - m_param_c2[i, "r"]
@@ -677,10 +675,10 @@ model <- function(inputs){
     }
   }
   
-
-
-# Results -----------------------------------------------------------------
-
+  
+  
+  # Results -----------------------------------------------------------------
+  
   
   #get a results matrix for healthcare and chickens
   results_base_h <- f_expvalue(m_param,m_cost,m_rwd)
@@ -716,7 +714,7 @@ model <- function(inputs){
   
   #because there technically aren't any costs for the productivity side,
   #we use the negative productivity gain from base to intervention (a productivity gain would incur a negative 'cost')
-
+  
   ### Productivity
   incr_cost_prod <- total_results_prod[1,1] - total_results_prod[2,1] #hopefully negative
   incr_benefit_prod <- total_results_prod[2,2] - total_results_prod[1,2] #hopefully positive
@@ -766,13 +764,6 @@ model <- function(inputs){
                         NMB_macro = NMB_macro, icer_macro = icer_macro, implementation_cost = implementation_cost)
   outputs
   
-  return(outputs)
-  #   
-}
-# 
-model(inputs)
-
-
 # Scenario Analysis -------------------------------------------------------
 
 
