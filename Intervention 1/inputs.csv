@@ -1,14 +1,14 @@
 scenario,parameter,description,value,distribution,low,high,
-human,well_dead,background mortality rate,0.001583005,NA,,,
-human,birth_well,"background rate of entering the cohort (for example, if the cohort of interest was the total population this would be equivalent to the birth rate)",0.004212797,NA,,,
-human,s_dead,mortality rate of resistant cases,0.051878167,beta,0.001187254,0.001978756,
-human,r_dead,mortality rate of susceptible cases,0.055064565,beta,0.003159598,0.005265996,
-human,s_cost,healthcare system cost of susceptible infections,666.82,lognormal,4.64E-06,7.73E-06,
-human,r_cost,healthcare system cost of resistant infections,846.8614,lognormal,9.85E-05,0.000164173,
-human,hrqol_death,health-related quality of life loss associated with an excess death,0,NA,,,
-human,hrqol_ill,health-related quality of life loss associated with susceptible infection,0.9795,NA,,,
+human,well_dead,background mortality rate,0.001583005,,,,
+human,birth_well,"background rate of entering the cohort (for example, if the cohort of interest was the total population this would be equivalent to the birth rate)",0.004212797,,,,
+human,s_dead,mortality rate of resistant cases,0.051878167,,,,
+human,r_dead,mortality rate of susceptible cases,0.055064565,,,,
+human,s_cost,healthcare system cost of susceptible infections,666.82,,,,
+human,r_cost,healthcare system cost of resistant infections,846.8614,,,,
+human,hrqol_death,health-related quality of life loss associated with an excess death,0,,,,
+human,hrqol_ill,health-related quality of life loss associated with susceptible infection,0.9795,,,,
 human,hrqol_res,health-related quality of life loss associated with resistant infection,0.973965,,,,
-human,expected_ly,additional years of life expected based on age,46,NA,,,
+human,expected_ly,additional years of life expected based on age,46,,,,
 human,lfpr,labour force participation rate,0.729745,,,,
 human,lfpr_growth,annual growth in lfpr,0,,,,
 human,prod,international USD per year per worker,4400,,,,
@@ -19,7 +19,7 @@ human,background_qol,background quality of life for those in 'well',1,,,,
 human,cost-effectiveness threshold, ,2365,,603,4128,"from Woods et al., 2016 (adjusted for inflation)"
 human,sick_seq,chance of developing lifelong sequelae following an infection,0.405, , , ,
 human,hrqol_seq,quality of life with sequelae,0.9355,,,,
-human,amr_growth,annual growth in background AMR prevalence,1.02844688,uniform,1,1.04,
+human,amr_growth,annual growth in background AMR prevalence,1.02844688,,,,
 human,disease_risk,chance of getting an infection,1.37E-04,,,,
 human,portion_resistant,portion of infections which are resistant,4.51E-02,,,,
 human,well_r,probability of  getting resistance infections in a year,6.19E-06,NA,,,
@@ -27,41 +27,42 @@ human,well_s,probability of getting susceptible infections ,1.31E-04,NA,,,
 human ,population,population in 2021,9.82E+07,,,,
 human,n_population,please work,9.82E+07,,,,
 ,,,,,,,
-chicken,all_dead,on-farm mortality rate,0.25,normal,,,"From Phu et al. (2021). In a higher-mortality setting, Carrique-Mas et al. (2019) estimate 0.377612 during an 18-week cycle. was previously 0.032364682 ~ N from 0.024273512 to 0.040456"
-chicken,birth_well,background birth rate of livestock,1,NA,,,
-chicken,c_animal,general cost per animal kept,2.064,lognormal,1.38675,2.74125,"Have edited to remove the 0.645 USD cost of buying the chicken, assuming they are born on farm"
-chicken,i_animal,income per animal sold,4.8,normal,3.6,6,
-chicken,s_cost,cost of treating susceptible infection,1,lognormal,0.75,1.25,
-chicken,r_cost,cost of treating resistant infection,2,uniform,1.5,2.5,
-chicken,annual_cycles,number of annual production cycles for chickens,3,NA,,,"Phu et al., 2021 find that the median production cycle length is 18 weeks [IQR 16-20]"
+chicken,all_dead,on-farm mortality rate,0.25,,,,"From Phu et al. (2021). In a higher-mortality setting, Carrique-Mas et al. (2019) estimate 0.377612 during an 18-week cycle. was previously 0.032364682 ~ N from 0.024273512 to 0.040456"
+chicken,birth_well,background birth rate of livestock,1,,,,
+chicken,c_animal,general cost per animal kept,2.709,,,,includes the cost of buying  a chick
+chicken,i_animal,income per animal sold,4.8,,,,
+chicken,s_cost,cost of treating susceptible infection,0,,,,assumed that it is not worth the time of the farmer to tend to a sick chicken
+chicken,r_cost,cost of treating resistant infection,0,,,,assumed that it is not worth the time of the farmer to tend to a sick chicken
+chicken,annual_cycles,number of annual production cycles for chickens,3,,,,"Phu et al., 2021 find that the median production cycle length is 18 weeks [IQR 16-20]"
 chicken,disease_risk,chance of getting an infection,0.4,,,,
 chicken,portion_resistant,portion of infections which are resistant,0.22,,,,
-chicken,well_r,probability of  getting resistance infections in a year,0.088,beta,0.066,0.11,
-chicken,well_s,probability of getting susceptible infections ,0.312,beta,0.234,0.39,
+chicken,well_r,probability of  getting resistance infections in a year,0.088,,,,
+chicken,well_s,probability of getting susceptible infections ,0.312,,,,
 chicken,n_animals,number of animals per farm,2500,,,,
 chicken,n_farms,number of farms nationwide,34266,,,,
 ,,,,,,,
-pig,all_dead,on-farm mortality rate, , ,,,
-pig,birth_well,background birth rate of livestock,1,,,,
-pig,c_animal,general cost per animal kept,152.29,lognormal,,,"from Coyne et al., 2020"
-pig,i_animal,income per animal sold,169.28,normal,,,"from Coyne et al., 2020. Most optimistic scenario"
-pig,s_cost,cost of treating susceptible infection, ,lognormal,,,
-pig,r_cost,cost of treating resistant infection, ,uniform,,,
-pig,annual_cycles,number of annual production cycles for chickens,1,NA,,,
-pig,disease_risk,chance of getting an infection,0.4,,,,
-pig,portion_resistant,portion of infections which are resistant,0.22,,,,
-pig,well_r,probability of  getting resistance infections in a year, ,beta,,,
-pig,well_s,probability of getting susceptible infections , ,beta,,,
-pig,n_animals,number of animals per farm, , ,,,
-pig,n_farms,number of farms nationwide, , ,,,
-,,,,,,,
-intervention,u_RH_low,low scenario for intervention effect on human AMR,-0.025,,,,
-intervention,u_RH_med,medium scenario for intervention effect on human AMR,-0.05,,,,
-intervention,u_RH_hi,high scenario for intervention effect on human AMR,-0.1,,,,
-intervention,u_RH_max,max scenario for intervention effect on human AMR,-0.16,,,,
-intervention,admin_cost,administrative cost to the public sector (USD),1000000,,,,
-intervention,pig_income_effect,proportional change in income per pig from intervention, ,,,,
-intervention,chicken_income_effect,proportional change in income per chicken from intervention,0.071,,,,
-intervention,farm_int_cost,annual intervention cost per farm ($USD),121.1,,,,
-intervention,chicken_mort_effect,change in chicken mortality following intervention,-0.4,,,,
-intervention,pig_mort_effect,change in pig mortality following intervention, , ,,,
+pig,all_dead,on-farm mortality rate,0, ,,,assumed that pigs do not die during the 4-month production cycle
+pig,birth_well,background birth rate of livestock,1, ,,,
+pig,c_animal,general cost per animal kept,152.29, ,,,"from Coyne et al., 2020 (based on small-scale farms)"
+pig,i_animal,income per animal sold,169.28, ,,,"from Coyne et al., 2020 (based on small-scale farms). Most optimistic scenario"
+pig,s_cost,cost of treating susceptible infection,0.54, ,,,labour cost of looking after sick animal (from pig probiotic trial)
+pig,r_cost,cost of treating resistant infection,0.54, ,,,labour cost of looking after sick animal (from pig probiotic trial)
+pig,annual_cycles,number of annual production cycles for chickens,2.5, ,,,"from S,T,F"
+pig,disease_risk,chance of getting an infection,0, ,,,
+pig,portion_resistant,portion of infections which are resistant,0.22, ,,,
+pig,well_r,probability of  getting resistance infections in a year,0, ,,,assume that any difference in morbidity is cpatured by differences in final bodyweight
+pig,well_s,probability of getting susceptible infections ,0, ,,,assume that any difference in morbidity is cpatured by differences in final bodyweight
+pig,n_animals,number of animals per farm,9.5641451, ,,,"from S,T,F. Total #animals / total # farms"
+pig,n_farms,number of farms nationwide,2050944, ,,,"from S,T,F"
+,,,, ,,,
+intervention,u_RH_low,low scenario for intervention effect on human AMR,-0.025, ,,,
+intervention,u_RH_med,medium scenario for intervention effect on human AMR,-0.05, ,,,
+intervention,u_RH_hi,high scenario for intervention effect on human AMR,-0.1, ,,,
+intervention,u_RH_max,max scenario for intervention effect on human AMR,-0.16, ,,,
+intervention,admin_cost,administrative cost to the public sector (USD),1000000, ,,,
+intervention,pig_income_effect,proportional change in income per pig from intervention,0, ,,,"Analysis of preliminary data from S,F&T's probiotic trial reveals no difference in weight"
+intervention,pig_money_saved,money saved by using probiotic feed rather than antibiotic (USD),2.07, , , , 
+intervention,chicken_income_effect,proportional change in income per chicken from intervention,0.071, ,,,
+intervention,farm_int_cost,annual intervention cost per farm ($USD),121.1, ,,,
+intervention,chicken_mort_effect,change in chicken mortality following intervention,-0.4, ,,,
+intervention,pig_mort_effect,change in pig mortality following intervention,0, ,,,
