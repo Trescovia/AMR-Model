@@ -28,13 +28,13 @@ lfpr <- 0.767
 hosp_time_res <- 1-0.923504449
 hosp_time_sus <- 1-0.94
 remaining_working_years <- 34
-intervention_followup_period <- 1
 
 #Scenarios
 scenario <- "HCA" #must be "HCA" or "FCA"
 scenario_transmission <- "med" #for now, must be {'hi', 'low', 'med', 'max'}
 scenario_outcomes <- "All" #must be either "Enterobacteria" or "All"
-scenario_intervention_level <- "Farm" #must be either "Village" or "Farm" ##DTE added a scenario for implementing at the village level
+scenario_intervention_level <- "Village" #must be either "Village" or "Farm" ##DTE added a scenario for implementing at the village level
+intervention_followup_period <- 2
 
 # Calculating per-farm intervention cost ----------------------------------
 
@@ -1151,7 +1151,7 @@ model(inputs)
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
 
-# Probabilistic Sensitivity Analysis --------------------------------------
+# Montecarlo Simulation --------------------------------------
 
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
@@ -1169,22 +1169,212 @@ cost_per_farm_village <- seminar_cost/farmers_per_seminar +
   visit_length_village*hourly_compensation*visits_per_year
 
 ##Creating a vector to store the NMBs 
-CEAC_NMB_vector <- c(rep(0,1000))
+CEAC_NMB_vector <- c(rep(0,10000))
 
-for(i in 1:1000){
+inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
+inputs <- as.data.table(inputs)
+inputsPSA <- inputs
+
+set.seed(42069)
+
+for(i in 1:10000){
   #load dataset
   inputsPSA <- inputs
   
-  #random draws of relevant variables
-  for(j in c(1,3:6,8,9,11:16,19:24,29,31:34,36:38,43,45:48,50:53,58,61:68)){
-    inputsPSA[j,4] <- runif(1,as.numeric(inputsPSA[j,6]),as.numeric(inputsPSA[j,7]))
-  }
+  # #random draws of relevant variables
+  # for(j in c(1,3:6,8,9,11:16,19:24,29,31:34,36:38,43,45:48,50:53,58,61:68)){
+  #   inputsPSA[j,4] <- runif(1,as.numeric(inputsPSA[j,6]),as.numeric(inputsPSA[j,7]))
+  # }
+  
+  inputsPSA[1,4] <- runif(1,as.numeric(inputsPSA[1,6]),as.numeric(inputsPSA[1,7]))
+  inputsPSA[3,4] <- runif(1,as.numeric(inputsPSA[3,6]),as.numeric(inputsPSA[3,7]))
+  inputsPSA[4,4] <- runif(1,as.numeric(inputsPSA[4,6]),as.numeric(inputsPSA[4,7]))
+  inputsPSA[5,4] <- runif(1,as.numeric(inputsPSA[5,6]),as.numeric(inputsPSA[5,7]))
+  inputsPSA[6,4] <- runif(1,as.numeric(inputsPSA[6,6]),as.numeric(inputsPSA[6,7]))
+  inputsPSA[8,4] <- runif(1,as.numeric(inputsPSA[8,6]),as.numeric(inputsPSA[8,7]))
+  inputsPSA[9,4] <- runif(1,as.numeric(inputsPSA[9,6]),as.numeric(inputsPSA[9,7]))
+  inputsPSA[11,4] <- runif(1,as.numeric(inputsPSA[11,6]),as.numeric(inputsPSA[11,7]))
+  inputsPSA[12,4] <- runif(1,as.numeric(inputsPSA[12,6]),as.numeric(inputsPSA[12,7]))
+  inputsPSA[13,4] <- runif(1,as.numeric(inputsPSA[13,6]),as.numeric(inputsPSA[13,7]))
+  inputsPSA[14,4] <- runif(1,as.numeric(inputsPSA[14,6]),as.numeric(inputsPSA[14,7]))
+  inputsPSA[15,4] <- runif(1,as.numeric(inputsPSA[15,6]),as.numeric(inputsPSA[15,7]))
+  inputsPSA[16,4] <- runif(1,as.numeric(inputsPSA[16,6]),as.numeric(inputsPSA[16,7]))
+  inputsPSA[19,4] <- runif(1,as.numeric(inputsPSA[19,6]),as.numeric(inputsPSA[19,7]))
+  inputsPSA[20,4] <- runif(1,as.numeric(inputsPSA[20,6]),as.numeric(inputsPSA[20,7]))
+  inputsPSA[21,4] <- runif(1,as.numeric(inputsPSA[21,6]),as.numeric(inputsPSA[21,7]))
+  inputsPSA[22,4] <- runif(1,as.numeric(inputsPSA[22,6]),as.numeric(inputsPSA[22,7]))
+  inputsPSA[23,4] <- runif(1,as.numeric(inputsPSA[23,6]),as.numeric(inputsPSA[23,7]))
+  inputsPSA[24,4] <- runif(1,as.numeric(inputsPSA[24,6]),as.numeric(inputsPSA[24,7]))
+  inputsPSA[29,4] <- runif(1,as.numeric(inputsPSA[29,6]),as.numeric(inputsPSA[29,7]))
+  inputsPSA[31,4] <- runif(1,as.numeric(inputsPSA[31,6]),as.numeric(inputsPSA[31,7]))
+  inputsPSA[32,4] <- runif(1,as.numeric(inputsPSA[32,6]),as.numeric(inputsPSA[32,7]))
+  inputsPSA[33,4] <- runif(1,as.numeric(inputsPSA[33,6]),as.numeric(inputsPSA[33,7]))
+  inputsPSA[34,4] <- runif(1,as.numeric(inputsPSA[34,6]),as.numeric(inputsPSA[34,7]))
+  inputsPSA[36,4] <- runif(1,as.numeric(inputsPSA[36,6]),as.numeric(inputsPSA[36,7]))
+  inputsPSA[37,4] <- runif(1,as.numeric(inputsPSA[37,6]),as.numeric(inputsPSA[37,7]))
+  inputsPSA[38,4] <- runif(1,as.numeric(inputsPSA[38,6]),as.numeric(inputsPSA[38,7]))
+  inputsPSA[43,4] <- runif(1,as.numeric(inputsPSA[43,6]),as.numeric(inputsPSA[43,7]))
+  inputsPSA[45,4] <- runif(1,as.numeric(inputsPSA[45,6]),as.numeric(inputsPSA[45,7]))
+  inputsPSA[46,4] <- runif(1,as.numeric(inputsPSA[46,6]),as.numeric(inputsPSA[46,7]))
+  inputsPSA[47,4] <- runif(1,as.numeric(inputsPSA[47,6]),as.numeric(inputsPSA[47,7]))
+  inputsPSA[48,4] <- runif(1,as.numeric(inputsPSA[48,6]),as.numeric(inputsPSA[48,7]))
+  inputsPSA[50,4] <- runif(1,as.numeric(inputsPSA[50,6]),as.numeric(inputsPSA[50,7]))
+  inputsPSA[51,4] <- runif(1,as.numeric(inputsPSA[51,6]),as.numeric(inputsPSA[51,7]))
+  inputsPSA[52,4] <- runif(1,as.numeric(inputsPSA[52,6]),as.numeric(inputsPSA[52,7]))
+  inputsPSA[53,4] <- runif(1,as.numeric(inputsPSA[53,6]),as.numeric(inputsPSA[53,7]))
+  inputsPSA[58,4] <- runif(1,as.numeric(inputsPSA[58,7]),as.numeric(inputsPSA[58,6]))
+  inputsPSA[61,4] <- runif(1,as.numeric(inputsPSA[61,7]),as.numeric(inputsPSA[61,6]))
+  inputsPSA[62,4] <- runif(1,as.numeric(inputsPSA[62,6]),as.numeric(inputsPSA[62,7]))
+  inputsPSA[63,4] <- runif(1,as.numeric(inputsPSA[63,6]),as.numeric(inputsPSA[63,7]))
+  inputsPSA[64,4] <- runif(1,as.numeric(inputsPSA[64,6]),as.numeric(inputsPSA[64,7]))
+  inputsPSA[65,4] <- runif(1,as.numeric(inputsPSA[65,6]),as.numeric(inputsPSA[65,7]))
+  inputsPSA[66,4] <- runif(1,as.numeric(inputsPSA[66,7]),as.numeric(inputsPSA[66,6]))
+  inputsPSA[67,4] <- runif(1,as.numeric(inputsPSA[67,7]),as.numeric(inputsPSA[67,6]))
+  inputsPSA[68,4] <- runif(1,as.numeric(inputsPSA[68,6]),as.numeric(inputsPSA[68,7]))
   
   #store NMB in vector
   CEAC_NMB_vector[i] <- as.data.frame(model(inputsPSA))[1,1]
 }
 
+write.xlsx(CEAC_NMB_vector, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Montecarlo Results.xlsx")
 
+density <- ecdf(CEAC_NMB_vector)
+plot(density,
+     xlab = "Net Monetary Benefit ($USD)",
+     ylab = "Cumulative Density",
+     main = "Distribution of NMB Values from Montecarlo Simulation - 73.48% Cost-Effective")
+abline(v = 0, col = "blue", lty = 2, lwd = 2) 
+
+MCresults <- CEAC_NMB_vector
+
+MCfail <- MCresults[MCresults < 0] #2652 were below zero, so the intervention was cost-effective 73.48% of the time
+max(MCresults)
+min(MCresults)
+mean(MCresults)
+
+
+# Tornado Plot ------------------------------------------------------------
+
+##Setting Scenario
+inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
+inputs <- as.data.table(inputs)
+scenario <- "HCA"
+scenario_transmission <- "med"
+scenario_outcomes <- "All"
+scenario_intervention_level <- "Village"
+intervention_followup_period <- 2
+cost_per_farm_village <- seminar_cost/farmers_per_seminar + 
+  seminar_length*hourly_compensation + transport_cost +
+  (visit_cost + ((group_size - 1)*additional_time_per_farm*hourly_compensation))*(visits_per_year/group_size) +
+  visit_length_village*hourly_compensation*visits_per_year
+
+#get base case NMB
+tornado_base <- as.data.frame(model(inputs))[1,1]
+
+#uptake (pig side)
+inputstornado <- inputs
+inputstornado[68,4] <- inputs[68,6]
+uptake_low <- as.data.frame(model(inputstornado))[1,1]
+uptake_low <- uptake_low - tornado_base
+inputstornado[68,4] <- inputs[68,7]
+uptake_high <- as.data.frame(model(inputstornado))[1,1]
+uptake_high <- uptake_high - tornado_base
+
+#effect on pig mortality
+inputstornado <- inputs
+inputstornado[67,4] <- inputs[67,6]
+pigmort_low <- as.data.frame(model(inputstornado))[1,1]
+pigmort_low <- pigmort_low - tornado_base
+inputstornado[67,4] <- inputs[67,7]
+pigmort_high <- as.data.frame(model(inputstornado))[1,1]
+pigmort_high <- pigmort_high - tornado_base
+
+#effect on chicken mortality
+inputstornado <- inputs
+inputstornado[66,4] <- inputs[66,6]
+chickmort_low <- as.data.frame(model(inputstornado))[1,1]
+chickmort_low <- chickmort_low - tornado_base
+inputstornado[66,4] <- inputs[66,7]
+chickmort_high <- as.data.frame(model(inputstornado))[1,1]
+chickmort_high <- chickmort_high - tornado_base
+
+#farm intervention cost
+inputstornado <- inputs
+cost_per_farm_village <- as.numeric(inputs[65,7])
+farmcost_low <- as.data.frame(model(inputstornado))[1,1]
+farmcost_low <- farmcost_low - tornado_base
+cost_per_farm_village <- as.numeric(inputs[66,6])
+farmcost_high <- as.data.frame(model(inputstornado))[1,1]
+farmcost_high <- farmcost_high - tornado_base
+
+#effect on chicken bodyweight
+inputstornado <- inputs
+inputstornado[64,4] <- inputs[64,6]
+chickweight_low <- as.data.frame(model(inputstornado))[1,1]
+chickweight_low <- chickweight_low - tornado_base
+inputstornado[64,4] <- inputs[64,7]
+chickweight_high <- as.data.frame(model(inputstornado))[1,1]
+chickweight_high <- chickweight_high - tornado_base
+
+#effect on pig bodyweight
+inputstornado <- inputs
+inputstornado[62,4] <- inputs[62,6]
+pigweight_low <- as.data.frame(model(inputstornado))[1,1]
+pigweight_low <- pigweight_low - tornado_base
+inputstornado[62,4] <- inputs[62,7]
+pigweight_high <- as.data.frame(model(inputstornado))[1,1]
+pigweight_high <- pigweight_high - tornado_base
+
+#money saved on pig feed
+inputstornado <- inputs
+inputstornado[63,4] <- inputs[63,6]
+pigfeed_low <- as.data.frame(model(inputstornado))[1,1]
+pigfeed_low <- pigfeed_low - tornado_base
+inputstornado[63,4] <- inputs[63,7]
+pigfeed_high <- as.data.frame(model(inputstornado))[1,1]
+pigfeed_high <- pigfeed_high - tornado_base
+
+#fixed administrative cost
+inputstornado <- inputs
+inputstornado[61,4] <- inputs[61,6]
+admin_low <- as.data.frame(model(inputstornado))[1,1]
+admin_low <- admin_low - tornado_base
+inputstornado[61,4] <- inputs[61,7]
+admin_high <- as.data.frame(model(inputstornado))[1,1]
+admin_high <- admin_high - tornado_base
+
+#effect on human AMR
+inputstornado <- inputs
+inputstornado[58,4] <- inputs[58,6]
+AMR_low <- as.data.frame(model(inputstornado))[1,1]
+AMR_low <- AMR_low - tornado_base
+inputstornado[58,4] <- inputs[58,7]
+AMR_high <- as.data.frame(model(inputstornado))[1,1]
+AMR_high <- AMR_high - tornado_base
+
+tornado <- data.frame(variable = c("Uptake (Pigs)",
+                                   "Effect on Pig Mortality",
+                                   "Effect on Chicken Mortality",
+                                   "Per-Farm Intervention Cost",
+                                   "Effect on Chicken Bodyweight",
+                                   "Effect on Pig Bodyweight",
+                                   "Money Saved on Probiotic Pig Feed",
+                                   "Administrative Cost",
+                                   "Effect on Human AMR"),
+                      min = c(uptake_low, pigmort_low, chickmort_low, farmcost_low, chickweight_low,
+                              pigweight_low, pigfeed_low, admin_low, AMR_low),
+                      max = c(uptake_high, pigmort_high, chickmort_high, farmcost_high, chickweight_high,
+                              pigweight_high, pigfeed_high, admin_high, AMR_high))
+
+
+ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
+  geom_linerange(size = 10) +
+  coord_flip() +
+  xlab("") +
+  ggtitle("Change in Macro-Level Net Monetary Benefit along Range of Each Parameter")+
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15))
 
 
 
