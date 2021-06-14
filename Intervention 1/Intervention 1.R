@@ -173,7 +173,7 @@ inputs <- as.data.table(inputs)
 # Main Model --------------------------------------------------------------
 
 model <- function(inputs){
-  
+
   inputs[ , value := as.numeric(as.character(value))]
   
   human <- inputs[scenario=="human"]
@@ -1118,6 +1118,9 @@ counts_default <- c(1.77, 0.828, 0.00488, 0.00257, -7.35)
 barplot(counts_default, main="Contribution to Net Monetary Benefit, Default Scenario (bn $USD)", horiz=F,
         names.arg=c("Poultry Sector", "Pig Sector", "Labour Productivity", "Healthcare Sector", "Implementation Cost"))
 
+counts_2 <- c(1.77, 0.828, 0.00488, 0.00257, -01.79)
+barplot(counts_2, main="Contribution to Net Monetary Benefit, Default Scenario (bn $USD)", horiz=F,
+        names.arg=c("Poultry Sector", "Pig Sector", "Labour Productivity", "Healthcare Sector", "Implementation Cost"))
 
 # Pessimistic Scenario ----------------------------------------------------
 
