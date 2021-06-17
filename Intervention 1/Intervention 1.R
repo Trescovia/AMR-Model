@@ -172,7 +172,7 @@ inputs <- as.data.table(inputs)
 
 # Main Model --------------------------------------------------------------
 
-model <- function(inputs){
+# model <- function(inputs){
 
   inputs[ , value := as.numeric(as.character(value))]
   
@@ -982,11 +982,11 @@ model <- function(inputs){
   
   outputs
   
-  return(outputs)
-
-}
-
-model(inputs)
+#   return(outputs)
+# 
+# }
+# 
+# model(inputs)
 
 # Scenario Analysis -------------------------------------------------------
 
@@ -1111,6 +1111,58 @@ scenario_analysis_intervention_frequency[4,2:8] <- as.numeric(model(inputs)[1,1:
 
 write.xlsx(scenario_analysis_intervention_frequency, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis Intervention Frequency Village.xlsx")
 
+scenario_analysis_timeframe <- matrix(rep(0), nrow = 5, ncol = 8)
+colnames(scenario_analysis_timeframe) <- c("Timeframe (Years)", "Net Monetary Benefit (Overall)",
+                                                        "QALYs Saved", "Net Monetary Benefit (Healthcare)", 
+                                                        "Net Monetary Benefit (Productivity)", "Net Monetary Benefit (Poultry)",
+                                                        "Net Monetary Benefit (Pig Sector)", "Implementation cost")
+scenario <- "HCA"
+scenario_transmission <- "med"
+scenario_outcomes <- "All"
+scenario_intervention_level <- "Village"
+intervention_followup_period <- 2
+
+n.t <- 11
+scenario_analysis_timeframe[1,1] <- "10"
+scenario_analysis_timeframe[1,2:8] <- as.numeric(model(inputs)[1,1:7])
+
+n.t <- 21
+scenario_analysis_timeframe[2,1] <- "20"
+scenario_analysis_timeframe[2,2:8] <- as.numeric(model(inputs)[1,1:7])
+
+n.t <- 31
+scenario_analysis_timeframe[3,1] <- "30"
+scenario_analysis_timeframe[3,2:8] <- as.numeric(model(inputs)[1,1:7])
+
+n.t <- 41
+scenario_analysis_timeframe[4,1] <- "40"
+scenario_analysis_timeframe[4,2:8] <- as.numeric(model(inputs)[1,1:7])
+
+n.t <- 47
+scenario_analysis_timeframe[5,1] <- "46"
+scenario_analysis_timeframe[5,2:8] <- as.numeric(model(inputs)[1,1:7])
+
+write.xlsx(scenario_analysis_timeframe, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis Timeframe.xlsx")
+
+##to plot NMB at different timeframes
+
+timeframe <- matrix(rep(0), nrow = 37, ncol = 2)
+colnames(timeframe) <- c("Timeframe (Years)", "Net Monetary Benefit (Overall), $USD")
+
+timeframe[1:37,1] <- c(10:46)
+
+for (i in 11:47) {
+  n.t <- i
+  timeframe[i-10,2] <- as.numeric(model(inputs)[1,1])
+  rm(i)
+}
+
+plot(timeframe,
+     main = "Net Monetary Benefit along Different Time Frames")
+
+timeframe <- as.data.table(timeframe)
+min(timeframe$`Net Monetary Benefit (Overall), $USD`)
+max(timeframe$`Net Monetary Benefit (Overall), $USD`)
 
 # Bar Plots ---------------------------------------------------------------
 
@@ -1380,4 +1432,33 @@ ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
   theme(axis.text = element_text(size = 15))
 
 
+# Plotting Morbidity and Mortality over Time ------------------------------
+
+mparam_plot <- cbind(m_param[,1:4],m_param2[,2:4])
+colnames(mparam_plot) <- c("year", "res_base", "sus_base", "dead_base", "res_int", "sus_int", "dead_int")
+mparam_plot <- as.data.frame(mparam_plot)
+mparam_plot$year <- c(2021:2067)
+
+ggplot(data = mparam_plot, aes(x = year, y = res_base))+
+  geom_point(aes(x = year, y = res_base), colour = 'blue')+
+  geom_point(aes(x = year, y = res_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Resistant Infections") +
+  ggtitle("Resistant Infections in the Baseline (Blue) and Intervention (Red) Scenarios")
+
+ggplot(data = mparam_plot, aes(x = year, y = sus_base))+
+  geom_point(aes(x = year, y = sus_base), colour = 'blue')+
+  geom_point(aes(x = year, y = sus_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Susceptible Infections") +
+  ggtitle("Susceptible Infections in the Baseline (Blue) and Intervention (Red) Scenarios")
+
+ggplot(data = mparam_plot, aes(x = year, y = dead_base))+
+  geom_point(aes(x = year, y = dead_base), colour = 'blue')+
+  geom_point(aes(x = year, y = dead_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Deaths") +
+  ggtitle("Deaths in the Baseline (Blue) and Intervention (Red) Scenarios")
+
+  
 
