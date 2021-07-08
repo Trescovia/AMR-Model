@@ -16,6 +16,7 @@ library("MonoInc")
 library("pksensi")
 library("sensitivity")
 library("xlsx")
+library("gridExtra")
 
 # Global parameters and scenarios -----------------------------------------
 
@@ -33,8 +34,9 @@ remaining_working_years <- 34
 scenario <- "HCA" #must be "HCA" or "FCA"
 scenario_transmission <- "med" #for now, must be {'hi', 'low', 'med', 'max'}
 scenario_outcomes <- "All" #must be either "Enterobacteria" or "All"
-scenario_intervention_level <- "Village" #must be either "Village" or "Farm" ##DTE added a scenario for implementing at the village level
+scenario_intervention_level <- "Village" #must be either "Village" or "Farm" ##added a scenario for implementing at the village level
 intervention_followup_period <- 2
+scenario_amr_grow <- "med" #must be "lo", "med", "hi" or "max" ##DTE added AMR growth scenarios
 
 # Calculating per-farm intervention cost ----------------------------------
 
@@ -169,6 +171,19 @@ plot(portion_working)
 
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
+colnames(inputs) <- c("scenario", "parameter", "description", "value", "distribution", "low", "high", "notes")
+
+
+# Logistic Growth ---------------------------------------------------------
+
+logit_year <- c(1,16)
+((0.645+0.058+0.669+0.234)/4) #0.405
+((0.77+0.118+0.582+0.528)/4) #0.4995
+logit_prevalence <- c(0.4015,0.4995)
+logit_data <- as.data.frame(cbind(logit_year, logit_prevalence))
+
+logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data points to fit a logistic growth model
+
 
 # Main Model --------------------------------------------------------------
 
@@ -247,8 +262,21 @@ inputs <- as.data.table(inputs)
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
   #letting the chance of getting infected with resistant bacteria grow in each period
+  
+  amr_growth <- 1 ##DTE added scenarios for AMR growth
+  
+  if(scenario_amr_grow == "lo"){ 
+    amr_growth <- 1.01
+  } else if (scenario_amr_grow == "med"){
+    amr_growth <- human[parameter=="amr_growth", value]
+  } else if (scenario_amr_grow == "hi") {
+    amr_growth <- 1.05
+  } else if (scenario_amr_grow == "max"){
+    amr_growth <- 1.1
+  } ##DTE added scenarios for AMR growth
+  
   for (i in 2:(n.t)){
-    m_param[i, "r"] <- m_param[i-1, "r"]*human[parameter=="amr_growth", value]
+    m_param[i, "r"] <- m_param[i-1, "r"]*amr_growth
   }
   
   #keeping the overall prevalence of disease constant, we make sure that the number
@@ -258,10 +286,10 @@ inputs <- as.data.table(inputs)
   disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here
   
   for(i in 1:n.t){
-    if(m_param[i, "r"] > m_param[1,"r"]+m_param[1,"s"]){ ## changed from 'tuning'
-      m_param[i, "r"] <- m_param[1,"r"]+m_param[1,"s"] ## changed from 'tuning'
+    if(m_param[i, "r"] > 0.9*(m_param[1,"r"]+m_param[1,"s"])){ ##DTE changed maximum portion resistant to 90%
+      m_param[i, "r"] <- 0.9*(m_param[1,"r"]+m_param[1,"s"]) ##DTE changed maximum portion resistant to 90%
     }
-    m_param[i, "s"] <- m_param[1,"r"]+m_param[1,"s"] - m_param[i, "r"] ## changed from 'tuning'
+    m_param[i, "s"] <- m_param[1,"r"]+m_param[1,"s"] - m_param[i, "r"] 
   }
   
   ## the difference equation function: 
@@ -292,6 +320,10 @@ inputs <- as.data.table(inputs)
   }
   
   m_param <- f_human_epi(m_param,n.t) #applying the epi function for humans (base case)
+  
+  state_i[1:4] <- m_param[3,1:4] ##DTE made it so that deaths and illness begin to accrue from year 1
+  m_param[1, 1:length(state_names)] <- state_i ##DTE made it so that deaths and illness begin to accrue from year 1
+  m_param <- f_human_epi(m_param,n.t) ##DTE made it so that deaths and illness begin to accrue from year 1
   
   # Healthcare Costs --------------------------------------------------------
   
@@ -736,10 +768,10 @@ inputs <- as.data.table(inputs)
   
   #make sure that the total number of infections remains constant
   for(i in 1:n.t){
-    if(m_param2[i, "r"] > m_param2[1,"r"]+m_param2[1,"s"]){ ## added tuning (previously missing) and corrected from m_param to m_param2
-      m_param2[i, "r"] <- m_param2[1,"r"]+m_param2[1,"s"] ## added tuning (previously missing) and corrected from m_param to m_param2
+    if(m_param2[i, "r"] > 0.9*(m_param2[1,"r"]+m_param2[1,"s"])){ ##DTE changed maximum portion resistant to 90%
+      m_param2[i, "r"] <- 0.9*(m_param2[1,"r"]+m_param2[1,"s"]) ##DTE changed maximum portion resistant to 90%
     }
-    m_param2[i, "s"] <- m_param2[1,"r"]+m_param2[1,"s"] - m_param2[i, "r"] ## added tuning (previously missing) and corrected from m_param to m_param2
+    m_param2[i, "s"] <- m_param2[1,"r"]+m_param2[1,"s"] - m_param2[i, "r"]
   }
   
   ## clear state values
@@ -818,13 +850,13 @@ inputs <- as.data.table(inputs)
   
   #change in pig mortality
   
-  p_mort_int <- pig[parameter=="all_dead", value] + (pig[parameter=="all_dead", value]*intervention[parameter=="pig_mort_effect", value]*intervention[parameter=="uptake", value]) ##DTE adjusted for uptake
+  p_mort_int <- pig[parameter=="all_dead", value] + (pig[parameter=="all_dead", value]*intervention[parameter=="pig_mort_effect", value]*intervention[parameter=="uptake", value]) ##adjusted for uptake
   m_param_p2[ , "mort_w"] <- rep(p_mort_int, n.t)
   
-  m_param_p2[ , "mort_s"] <- rep(pig[parameter=="all_dead", value] + (pig[parameter=="all_dead", value]*intervention[parameter=="pig_mort_effect", value]*intervention[parameter=="uptake", value]), ##DTE adjusted for uptake
+  m_param_p2[ , "mort_s"] <- rep(pig[parameter=="all_dead", value] + (pig[parameter=="all_dead", value]*intervention[parameter=="pig_mort_effect", value]*intervention[parameter=="uptake", value]), ##adjusted for uptake
                                  n.t)
   
-  m_param_p2[ , "mort_r"] <- rep(pig[parameter=="all_dead", value] + (pig[parameter=="all_dead", value]*intervention[parameter=="pig_mort_effect", value]*intervention[parameter=="uptake", value]), ##DTE adjusted for uptake
+  m_param_p2[ , "mort_r"] <- rep(pig[parameter=="all_dead", value] + (pig[parameter=="all_dead", value]*intervention[parameter=="pig_mort_effect", value]*intervention[parameter=="uptake", value]), ##adjusted for uptake
                                  n.t)
   
   
@@ -844,7 +876,7 @@ inputs <- as.data.table(inputs)
   colnames(m_rwd_p2) <- parameter_names_p
   rownames(m_rwd_p2) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
-  r_sold_p2 <- (pig[parameter=="i_animal",value])*(1+intervention[parameter=="pig_income_effect", value]*intervention[parameter=="uptake", value])+intervention[parameter=="pig_money_saved",value]*intervention[parameter=="uptake", value] ##DTE adjusted for uptake 
+  r_sold_p2 <- (pig[parameter=="i_animal",value])*(1+intervention[parameter=="pig_income_effect", value]*intervention[parameter=="uptake", value])+intervention[parameter=="pig_money_saved",value]*intervention[parameter=="uptake", value] ##adjusted for uptake 
   rwd_i_p2 <- c(0,0,0,0,r_sold_p2)
   
   ## start at cycle 1 so you do not multiply initial state vector 
@@ -913,7 +945,7 @@ inputs <- as.data.table(inputs)
   results_interv_c <- f_expvalue(m_param_c2,m_cost_c2,m_rwd_c2)
   
   total_results_c<- matrix(rep(0), nrow=2, ncol=2)
-  colnames(total_results_c) <- c("Costs (Â£)", "Benefits (Â£)")
+  colnames(total_results_c) <- c("Costs ($)", "Benefits ($)")
   rownames(total_results_c) <- c("Base Case", "Intervention")
   
   #results matrix for pigs
@@ -921,7 +953,7 @@ inputs <- as.data.table(inputs)
   results_interv_p <- f_expvalue(m_param_p2,m_cost_p2,m_rwd_p2)
   
   total_results_p<- matrix(rep(0), nrow=2, ncol=2)
-  colnames(total_results_p) <- c("Costs (Â£)", "Benefits (Â£)")
+  colnames(total_results_p) <- c("Costs ($)", "Benefits ($)")
   rownames(total_results_p) <- c("Base Case", "Intervention")
   
   #outputs for healthcare 
@@ -952,14 +984,14 @@ inputs <- as.data.table(inputs)
   
   NMB_p <- (incr_benefit_p-incr_cost_p)*pig[parameter=="n_farms",value] #net monetary benefit to piggy sector
   
-  #outputs for implementation costs (fixed and per-farm) ##DTE corresponding to village vs. farm level scenario
+  #outputs for implementation costs (fixed and per-farm) ##corresponding to village vs. farm level scenario
   if(scenario_intervention_level == "Farm"){
     int_cost_per <- cost_per_farm_indiv
   } else if (scenario_intervention_level == "Village"){
     int_cost_per <- cost_per_farm_village
   }
   
-  intervention_cost_year <- (int_cost_per / intervention_followup_period) ##DTE changed to int_cost_per
+  intervention_cost_year <- (int_cost_per / intervention_followup_period) ##changed to int_cost_per
   dr_int_pgrowth <- dr - human[parameter=="prod_growth", value] ##discount rate net of productivity growth, as we assume that compensation for vet and farmer time increases to reflect wage growth
   int_cost_vector <- rep(0, n.t)
   for(i in 1:n.t){
@@ -990,11 +1022,39 @@ inputs <- as.data.table(inputs)
 
 # Scenario Analysis -------------------------------------------------------
 
+##AMR Growth
+scenario <- "HCA"
+scenario_transmission <- "med"
+scenario_outcomes <- "All"
+intervention_followup_period <- 2
+scenario_intervention_level <- "Village"
+scenario_amr_grow <- "med"
+
+scenario_analysis_amrgrowth <- matrix(rep(0), nrow = 4, ncol = 4)
+colnames(scenario_analysis_amrgrowth) <- c("NMB Overall", "QALYs Saved", "NMB to Healthcare", "Productivity Gains")
+rownames(scenario_analysis_amrgrowth) <- c("1% Annual Growth", "2.83% Annual Growth", "5% Annual Growth", "10% Annual Growth")
+
+scenario_amr_grow <- "lo"
+scenario_analysis_amrgrowth[1,1:4] <- as.numeric(model(inputs)[1,1:4]) 
+scenario_amr_grow <- "med"
+scenario_analysis_amrgrowth[2,1:4] <- as.numeric(model(inputs)[1,1:4]) 
+scenario_amr_grow <- "hi"
+scenario_analysis_amrgrowth[3,1:4] <- as.numeric(model(inputs)[1,1:4]) 
+scenario_amr_grow <- "max"
+scenario_analysis_amrgrowth[4,1:4] <- as.numeric(model(inputs)[1,1:4]) 
+
+write.xlsx(scenario_analysis_amrgrowth, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis AMR Growth.xlsx")
+
+
+##Transmission to Humans, Productivity Method, Bacteria Concerned
+
+###Farm level
 scenario <- "HCA"
 scenario_transmission <- "med"
 scenario_outcomes <- "All"
 intervention_followup_period <- 1
 scenario_intervention_level <- "Farm"
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 
 scenario_analysis_all <- matrix(rep(0), nrow = 4, ncol = 2)
 colnames(scenario_analysis_all) <- c("Human Capital Approach", "Friction Cost Approach")
@@ -1053,6 +1113,8 @@ scenario_analysis_Enterobacteriaceae[4,2] <- as.numeric(model(inputs)[1,1])
 write.xlsx(scenario_analysis_Enterobacteriaceae, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis Enterobacteriaceae.xlsx")
 
 
+##Intervention Frequeency and Village vs. Farm
+
 scenario_analysis_intervention_frequency <- matrix(rep(0), nrow = 4, ncol = 8)
 colnames(scenario_analysis_intervention_frequency) <- c("Portion of Farms Visited Every Year (%)", "Net Monetary Benefit (Overall)",
                                                         "QALYs Saved", "Net Monetary Benefit (Healthcare)", 
@@ -1063,6 +1125,7 @@ scenario <- "HCA"
 scenario_transmission <- "med"
 scenario_outcomes <- "All"
 scenario_intervention_level <- "Farm"
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 
 intervention_followup_period <- 1
 scenario_analysis_intervention_frequency[1,1] <- "100"
@@ -1083,12 +1146,13 @@ scenario_analysis_intervention_frequency[4,1] <- "10"
 scenario_analysis_intervention_frequency[4,2] <- as.numeric(model(inputs)[1,1])
 scenario_analysis_intervention_frequency[4,2:8] <- as.numeric(model(inputs)[1,1:7])
 
-write.xlsx(scenario_analysis_intervention_frequency, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis Intervention Frequency.xlsx")
+write.xlsx(scenario_analysis_intervention_frequency, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis Intervention Frequency Farm.xlsx")
 
 scenario <- "HCA"
 scenario_transmission <- "med"
 scenario_outcomes <- "All"
 scenario_intervention_level <- "Village"
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 
 intervention_followup_period <- 1
 scenario_analysis_intervention_frequency[1,1] <- "100"
@@ -1111,6 +1175,8 @@ scenario_analysis_intervention_frequency[4,2:8] <- as.numeric(model(inputs)[1,1:
 
 write.xlsx(scenario_analysis_intervention_frequency, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis Intervention Frequency Village.xlsx")
 
+##Timeframe
+
 scenario_analysis_timeframe <- matrix(rep(0), nrow = 5, ncol = 8)
 colnames(scenario_analysis_timeframe) <- c("Timeframe (Years)", "Net Monetary Benefit (Overall)",
                                                         "QALYs Saved", "Net Monetary Benefit (Healthcare)", 
@@ -1121,6 +1187,7 @@ scenario_transmission <- "med"
 scenario_outcomes <- "All"
 scenario_intervention_level <- "Village"
 intervention_followup_period <- 2
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 
 n.t <- 11
 scenario_analysis_timeframe[1,1] <- "10"
@@ -1166,18 +1233,15 @@ max(timeframe$`Net Monetary Benefit (Overall), $USD`)
 
 # Bar Plots ---------------------------------------------------------------
 
-counts_default <- c(1.77, 0.828, 0.00488, 0.00257, -7.35)
-barplot(counts_default, main="Contribution to Net Monetary Benefit, Default Scenario (bn $USD)", horiz=F,
+counts_1 <- c(1.77, 0.828, 0.0295, 0.00959, -7.35)
+barplot(counts_1, main="Contribution to Net Monetary Benefit, Default Scenario (bn $USD)", horiz=F,
         names.arg=c("Poultry Sector", "Pig Sector", "Labour Productivity", "Healthcare Sector", "Implementation Cost"))
 
-counts_2 <- c(1.77, 0.828, 0.00488, 0.00257, -01.79)
+counts_2 <- c(1.77, 0.828, 0.0295, 0.00959, -01.79)
 barplot(counts_2, main="Contribution to Net Monetary Benefit, Default Scenario (bn $USD)", horiz=F,
         names.arg=c("Poultry Sector", "Pig Sector", "Labour Productivity", "Healthcare Sector", "Implementation Cost"))
 
 # Pessimistic Scenario ----------------------------------------------------
-
-inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
-inputs <- as.data.table(inputs)
 
 inputs[68,4] <- inputs[parameter == "uptake", low] #uptake only 50% (pigs)
 inputs[67,4] <- inputs[parameter == "pig_mort_effect", low] #pig mortality increases 5%
@@ -1193,6 +1257,7 @@ scenario <- "HCA"
 scenario_transmission <- "med"
 scenario_outcomes <- "All"
 scenario_intervention_level <- "Village"
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 
 intervention_followup_period <- 1
 model(inputs)
@@ -1208,16 +1273,13 @@ inputs <- as.data.table(inputs)
 
 # Montecarlo Simulation --------------------------------------
 
-inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
-inputs <- as.data.table(inputs)
-inputsPSA <- inputs
-
 ##Setting scenarios
 scenario <- "HCA"
 scenario_transmission <- "med"
 scenario_outcomes <- "All"
 scenario_intervention_level <- "Village"
 intervention_followup_period <- 2
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 cost_per_farm_village <- seminar_cost/farmers_per_seminar + 
   seminar_length*hourly_compensation + transport_cost +
   (visit_cost + ((group_size - 1)*additional_time_per_farm*hourly_compensation))*(visits_per_year/group_size) +
@@ -1228,6 +1290,7 @@ CEAC_NMB_vector <- c(rep(0,10000))
 
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
+colnames(inputs) <- c("scenario", "parameter", "description", "value", "distribution", "low", "high", "notes")
 inputsPSA <- inputs
 
 set.seed(42069)
@@ -1235,12 +1298,7 @@ set.seed(42069)
 for(i in 1:10000){
   #load dataset
   inputsPSA <- inputs
-  
-  # #random draws of relevant variables
-  # for(j in c(1,3:6,8,9,11:16,19:24,29,31:34,36:38,43,45:48,50:53,58,61:68)){
-  #   inputsPSA[j,4] <- runif(1,as.numeric(inputsPSA[j,6]),as.numeric(inputsPSA[j,7]))
-  # }
-  
+
   inputsPSA[1,4] <- runif(1,as.numeric(inputsPSA[1,6]),as.numeric(inputsPSA[1,7]))
   inputsPSA[3,4] <- runif(1,as.numeric(inputsPSA[3,6]),as.numeric(inputsPSA[3,7]))
   inputsPSA[4,4] <- runif(1,as.numeric(inputsPSA[4,6]),as.numeric(inputsPSA[4,7]))
@@ -1282,7 +1340,8 @@ for(i in 1:10000){
   inputsPSA[62,4] <- runif(1,as.numeric(inputsPSA[62,6]),as.numeric(inputsPSA[62,7]))
   inputsPSA[63,4] <- runif(1,as.numeric(inputsPSA[63,6]),as.numeric(inputsPSA[63,7]))
   inputsPSA[64,4] <- runif(1,as.numeric(inputsPSA[64,6]),as.numeric(inputsPSA[64,7]))
-  inputsPSA[65,4] <- runif(1,as.numeric(inputsPSA[65,6]),as.numeric(inputsPSA[65,7]))
+  #inputsPSA[65,4] <- runif(1,as.numeric(inputsPSA[65,6]),as.numeric(inputsPSA[65,7]))
+  cost_per_farm_village <- runif(1,as.numeric(inputsPSA[65,6]),as.numeric(inputsPSA[65,7])) ##DTE corrected so intervention cost included
   inputsPSA[66,4] <- runif(1,as.numeric(inputsPSA[66,7]),as.numeric(inputsPSA[66,6]))
   inputsPSA[67,4] <- runif(1,as.numeric(inputsPSA[67,7]),as.numeric(inputsPSA[67,6]))
   inputsPSA[68,4] <- runif(1,as.numeric(inputsPSA[68,6]),as.numeric(inputsPSA[68,7]))
@@ -1291,18 +1350,19 @@ for(i in 1:10000){
   CEAC_NMB_vector[i] <- as.data.frame(model(inputsPSA))[1,1]
 }
 
-write.xlsx(CEAC_NMB_vector, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Montecarlo Results.xlsx")
+#write.xlsx(CEAC_NMB_vector, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Montecarlo Results.xlsx")
+write.xlsx(CEAC_NMB_vector, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Montecarlo Results 2 July 2021.xlsx")
 
 density <- ecdf(CEAC_NMB_vector)
 plot(density,
      xlab = "Net Monetary Benefit ($USD)",
      ylab = "Cumulative Density",
-     main = "Distribution of NMB Values from Montecarlo Simulation - 73.48% Cost-Effective")
+     main = "Distribution of NMB Values from Montecarlo Simulation - 76.83% Cost-Effective")
 abline(v = 0, col = "blue", lty = 2, lwd = 2) 
 
 MCresults <- CEAC_NMB_vector
 
-MCfail <- MCresults[MCresults < 0] #2652 were below zero, so the intervention was cost-effective 73.48% of the time
+MCfail <- MCresults[MCresults < 0] #2317 were below zero, so the intervention was cost-effective 76.83% of the time
 max(MCresults)
 min(MCresults)
 mean(MCresults)
@@ -1313,11 +1373,14 @@ mean(MCresults)
 ##Setting Scenario
 inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
+colnames(inputs) <- c("scenario", "parameter", "description", "value", "distribution", "low", "high", "notes")
+
 scenario <- "HCA"
 scenario_transmission <- "med"
 scenario_outcomes <- "All"
 scenario_intervention_level <- "Village"
 intervention_followup_period <- 2
+scenario_amr_grow <- "med" ##DTE reset to default AMR growth scenario
 cost_per_farm_village <- seminar_cost/farmers_per_seminar + 
   seminar_length*hourly_compensation + transport_cost +
   (visit_cost + ((group_size - 1)*additional_time_per_farm*hourly_compensation))*(visits_per_year/group_size) +
@@ -1358,9 +1421,14 @@ inputstornado <- inputs
 cost_per_farm_village <- as.numeric(inputs[65,7])
 farmcost_low <- as.data.frame(model(inputstornado))[1,1]
 farmcost_low <- farmcost_low - tornado_base
-cost_per_farm_village <- as.numeric(inputs[66,6])
+cost_per_farm_village <- as.numeric(inputs[65,6])
 farmcost_high <- as.data.frame(model(inputstornado))[1,1]
 farmcost_high <- farmcost_high - tornado_base
+
+cost_per_farm_village <- seminar_cost/farmers_per_seminar + 
+  seminar_length*hourly_compensation + transport_cost +
+  (visit_cost + ((group_size - 1)*additional_time_per_farm*hourly_compensation))*(visits_per_year/group_size) +
+  visit_length_village*hourly_compensation*visits_per_year
 
 #effect on chicken bodyweight
 inputstornado <- inputs
@@ -1434,6 +1502,8 @@ ggplot(tornado, aes(variable, ymin = min, ymax = max)) +
 
 # Plotting Morbidity and Mortality over Time ------------------------------
 
+##default
+
 mparam_plot <- cbind(m_param[,1:4],m_param2[,2:4])
 colnames(mparam_plot) <- c("year", "res_base", "sus_base", "dead_base", "res_int", "sus_int", "dead_int")
 mparam_plot <- as.data.frame(mparam_plot)
@@ -1444,21 +1514,98 @@ ggplot(data = mparam_plot, aes(x = year, y = res_base))+
   geom_point(aes(x = year, y = res_int), colour = 'red') +
   xlab("Year") +
   ylab("New Resistant Infections") +
-  ggtitle("Resistant Infections in the Baseline (Blue) and Intervention (Red) Scenarios")
+  ggtitle("Resistant Infections in the Baseline (Blue) and Intervention (Red) Scenarios") +
+  theme_bw()
 
 ggplot(data = mparam_plot, aes(x = year, y = sus_base))+
   geom_point(aes(x = year, y = sus_base), colour = 'blue')+
   geom_point(aes(x = year, y = sus_int), colour = 'red') +
   xlab("Year") +
   ylab("New Susceptible Infections") +
-  ggtitle("Susceptible Infections in the Baseline (Blue) and Intervention (Red) Scenarios")
+  ggtitle("Susceptible Infections in the Baseline (Blue) and Intervention (Red) Scenarios")+
+  theme_bw()
 
 ggplot(data = mparam_plot, aes(x = year, y = dead_base))+
   geom_point(aes(x = year, y = dead_base), colour = 'blue')+
   geom_point(aes(x = year, y = dead_int), colour = 'red') +
   xlab("Year") +
   ylab("New Deaths") +
-  ggtitle("Deaths in the Baseline (Blue) and Intervention (Red) Scenarios")
+  ggtitle("Deaths in the Baseline (Blue) and Intervention (Red) Scenarios") +
+  theme_bw()
 
-  
+##different background growth rates
+
+#run with lo
+scenario_amr_grow <- "lo"
+
+#run code
+
+mparam_plot_lo <- cbind(m_param[,1:4],m_param2[,2:4])
+colnames(mparam_plot_lo) <- c("year", "res_base", "sus_base", "dead_base", "res_int", "sus_int", "dead_int")
+mparam_plot_lo <- as.data.frame(mparam_plot_lo)
+mparam_plot_lo$year <- c(2021:2067)
+
+plot_lo <- ggplot(data = mparam_plot_lo, aes(x = year, y = res_base))+
+  geom_point(aes(x = year, y = res_base), colour = 'blue')+
+  geom_point(aes(x = year, y = res_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Resistant Infections") +
+  ggtitle("1%") +
+  theme_bw()
+
+#run with med
+scenario_amr_grow <- "med"
+
+#run code
+
+mparam_plot_med <- cbind(m_param[,1:4],m_param2[,2:4])
+colnames(mparam_plot_med) <- c("year", "res_base", "sus_base", "dead_base", "res_int", "sus_int", "dead_int")
+mparam_plot_med <- as.data.frame(mparam_plot_med)
+mparam_plot_med$year <- c(2021:2067)
+
+plot_med <- ggplot(data = mparam_plot_med, aes(x = year, y = res_base))+
+  geom_point(aes(x = year, y = res_base), colour = 'blue')+
+  geom_point(aes(x = year, y = res_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Resistant Infections") +
+  ggtitle("2.83%") +
+  theme_bw()
+
+#run with hi
+scenario_amr_grow <- "hi"
+
+#run code
+
+mparam_plot_hi <- cbind(m_param[,1:4],m_param2[,2:4])
+colnames(mparam_plot_hi) <- c("year", "res_base", "sus_base", "dead_base", "res_int", "sus_int", "dead_int")
+mparam_plot_hi <- as.data.frame(mparam_plot_hi)
+mparam_plot_hi$year <- c(2021:2067)
+
+plot_hi <- ggplot(data = mparam_plot_hi, aes(x = year, y = res_base))+
+  geom_point(aes(x = year, y = res_base), colour = 'blue')+
+  geom_point(aes(x = year, y = res_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Resistant Infections") +
+  ggtitle("5%") +
+  theme_bw()
+
+#run with max
+scenario_amr_grow <- "max"
+
+#run code
+
+mparam_plot_max <- cbind(m_param[,1:4],m_param2[,2:4])
+colnames(mparam_plot_max) <- c("year", "res_base", "sus_base", "dead_base", "res_int", "sus_int", "dead_int")
+mparam_plot_max <- as.data.frame(mparam_plot_max)
+mparam_plot_max$year <- c(2021:2067)
+
+plot_max <- ggplot(data = mparam_plot_max, aes(x = year, y = res_base))+
+  geom_point(aes(x = year, y = res_base), colour = 'blue')+
+  geom_point(aes(x = year, y = res_int), colour = 'red') +
+  xlab("Year") +
+  ylab("New Resistant Infections") +
+  ggtitle("10%") +
+  theme_bw()
+
+grid.arrange(plot_lo, plot_med, plot_hi, plot_max, top="New Annual Resistant Cases at Different Rates of Human AMR Growth")
 
