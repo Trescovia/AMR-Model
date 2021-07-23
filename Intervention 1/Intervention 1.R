@@ -27,11 +27,11 @@ n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 tstop <- n.t + 3
 dr <- 0.08 ## discount rate
 wtp <- 2365 ## willingness to pay per QALY gained
-emp_rate <- 0.98162 
-lfpr <- 0.767
-hosp_time_res <- 1-0.923504449
-hosp_time_sus <- 1-0.94
-remaining_working_years <- 34
+emp_rate <- 0.98162 ##employment rate (portion of working-age population)
+lfpr <- 0.767 ##labour force participation rate
+hosp_time_res <- 1-0.923504449 ##portion of a year spent in hospital with a resistant infection
+hosp_time_sus <- 1-0.94 ##portion of a year spent in hospital with a susceptible infection
+remaining_working_years <- 34 ##remaining working years of average person
 
 #Scenarios
 scenario <- "HCA" #must be "HCA" or "FCA"
@@ -164,7 +164,7 @@ plot(portion_working)
 ###
 # Here, we define our scenarios. We set the number of periods to be 46 (the expected
 # remaining life years in our population). We let the discount rate be 0.08 and the 
-# willingness to pay for a WALY be 2365 USD, both of which are derived from theory.
+# willingness to pay for a QALY be 2365 USD, both of which are derived from theory.
 # We have possible scenarios for a) the way we estimate productivity outcomes from
 # morbidity and mortality (either the human capital approach or the friction cost 
 # approach), b) the link parameter between animal AMU and human AMR (either from Tang
@@ -190,7 +190,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
 
 # Main Model --------------------------------------------------------------
 
-model <- function(inputs){
+# model <- function(inputs){
 
   inputs[ , value := as.numeric(as.character(value))]
   
@@ -251,16 +251,35 @@ model <- function(inputs){
     tuning <- 1
   }
   
-  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t)
+  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t) 
+  #chance of developing sequelae following infection
+  
   m_param[ , "r"] <- rep(tuning*human[parameter=="well_r",value], n.t)
+  #chance of developing a resistant infection in a year
+  
   m_param[ , "s"] <- rep(tuning*human[parameter=="well_s",value], n.t)
+  #chance of developing a susceptible infection in a year
+  
   m_param[ , "mort_r"] <- rep(human[parameter=="r_dead",value], n.t)
+  #fatality from resistant infection
+  
   m_param[ , "mort_s"] <- rep(human[parameter=="s_dead",value], n.t)
+  #fatality from susceptible infection
+  
   m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]+m_param[1,"sick_seq"]), n.t)
+  #chance of recovering from a resistant infection
+  
   m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]+m_param[1,"sick_seq"]), n.t)
-  m_param[ , "birth"] <- popchange[1:n.t] ##set to be predicted net births
-  m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births
-  m_param[ , "dead_aft"] <- rep(1, n.t) #all those who die go to the afterlife
+  #chance of recovering from a susceptible infection
+  
+  m_param[ , "birth"] <- popchange[1:n.t]
+  #predicted net births in a given year
+  
+  m_param[ , "mort_w"] <- rep(0, n.t) 
+  #chance of dying without infection from 'well', set to zero because background mortality is included in net births
+  
+  m_param[ , "dead_aft"] <- rep(1, n.t) 
+  #all those who die go to the afterlife
   
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
@@ -286,7 +305,7 @@ model <- function(inputs){
   #of infections with susceptible and resistant bacteria sum to the total number of
   #infections. Thus, the highest resistance outcome is one in which all infections are
   #resistant but the total number of infections remains the same
-  disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here
+  # disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here
   
   for(i in 1:n.t){
     if(m_param[i, "r"] > 0.9*(m_param[1,"r"]+m_param[1,"s"])){ ##DTE changed maximum portion resistant to 90%
@@ -300,7 +319,7 @@ model <- function(inputs){
     for (i in 2:(n.t)){
       
       m_param[i,"well"] <- m_param[i-1,"well"] -(m_param[i-1,"r"]*m_param[i-1,"well"]) -
-        (m_param[i-1,"s"]*m_param[i-1,"well"]) + m_param[i-1,"birth"] - ## changed so that we just add the births, not bloody multiple the population by them
+        (m_param[i-1,"s"]*m_param[i-1,"well"]) + m_param[i-1,"birth"] - 
         (m_param[i-1,"mort_w"]*m_param[i-1,"well"])+(m_param[i-1,"rec_r"]*m_param[i-1,"res"])+
         (m_param[i-1,"rec_s"]*m_param[i-1,"sus"])
       
@@ -559,9 +578,9 @@ model <- function(inputs){
     
     ## final states
     m_c_sum <- m_param_c_temp[4,]
-    m_c_sum[2] <- m_param_c_temp[2,2]
-    m_c_sum[3] <- m_param_c_temp[2,3]
-    m_c_sum[1] <- chicken[parameter=="n_animals", value] - m_c_sum[2] - m_c_sum[3] ## reset the number in 'well'
+    m_c_sum["res"] <- m_param_c_temp[2,"res"]
+    m_c_sum["sus"] <- m_param_c_temp[2,"sus"]
+    m_c_sum["well"] <- chicken[parameter=="n_animals", value] - m_c_sum["res"] - m_c_sum["sus"] ## reset the number in 'well'
     
     m_c_sum[1:5] <- chicken[parameter=="annual_cycles",value] * m_c_sum[1:5] #multiply by the number of annual cycles
     
@@ -570,8 +589,10 @@ model <- function(inputs){
     colnames(m_param_c) <- parameter_names_c
     rownames(m_param_c) <- paste("cycle", 0:(n.t-1), sep  =  "")
     
-    return(m_param_c)
+    m_param_c
     
+    return(m_param_c)
+
   }
   
   #apply the chicken epi function: ## named for chicken
@@ -1017,11 +1038,11 @@ model <- function(inputs){
   
   outputs
   
-  return(outputs)
-
-}
-
-model(inputs)
+#   return(outputs)
+# 
+# }
+# 
+# model(inputs)
 
 # Scenario Analysis -------------------------------------------------------
 
@@ -1660,3 +1681,22 @@ plot_max <- ggplot(data = mparam_plot_max, aes(x = year, y = res_base))+
 
 grid.arrange(plot_lo, plot_med, plot_hi, plot_max, top="New Annual Resistant Cases at Different Rates of Human AMR Growth")
 
+##difference in deaths (intervention vs. baseline) by year
+mort_diff <- c(rep(0,47))
+
+for(i in 1:47){
+  mort_diff[i] <- m_param[i,4] - m_param2[i,4]
+  rm(i)
+}
+
+mort_diff
+
+sum(mort_diff)
+
+mean(mort_diff)
+
+popchange2 <- popchange[1:46]
+
+mean(popchange2)
+
+mean(mort_diff) / mean(popchange2)

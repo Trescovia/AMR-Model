@@ -26,12 +26,20 @@ setwd(here::here()) # GK: setwd to where this Rproject is on your computer
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 tstop <- n.t + 3
 dr <- 0.08 ## discount rate ## GK: do you ever vary this? how come fixed? 
+##DTE not varied yet, but we can do scenario analysis. I have now explained in the modelling
+#paper how we got this
 wtp <- 2365 ## willingness to pay per QALY gained ## GK: is this fixed? is this for Viet Nam? we may have to vary for the framework scenario analysis? 
-emp_rate <- 0.98162  # GK: what is this? 
-lfpr <- 0.767 # GK: what is this? 
+##DTE Fixed for now. I have now explained in the modelling paper how we got this.
+#Yes, it is for Viet Nam. And yes let's do scenario analysis on it!
+emp_rate <- 0.98162  # GK: what is this? ##DTE portion of working-age people who are working
+lfpr <- 0.767 # GK: what is this? ##DTE labour force participation rate
 hosp_time_res <- 1-0.923504449  # GK: what is this? seems spuriously precise
-hosp_time_sus <- 1-0.94  # GK: seems v similar to above? 
-remaining_working_years <- 34  # GK: what does this assume? certain life expec and average age of infection? is that realistic? 
+##DTE portion of a year spent in hospital with a resistant infection
+hosp_time_sus <- 1-0.94  # GK: seems v similar to above? ##DTE quite similar - i.e. a person
+##with a susceptible infection spends 6% of a year in hospital but one with a resistant
+##infection spends 7.7% of a year
+remaining_working_years <- 34  # GK: what does this assume? certain life expec and average age of infection? is that realistic?
+##DTE it assumes that the average age of the population is the same as the average age of infection 
 
 #Scenarios
 scenario <- "HCA" #must be "HCA" or "FCA"
@@ -48,10 +56,13 @@ seminar_cost <- 25
 visit_cost <- 25
 farmers_per_seminar <- 10
 hourly_compensation <- 4.3 # GK: bit confused on the perspectives here: is this how much productivity they lose per hour? compensation seems an odd name for it 
+##DTE it is compensation in our case as we assume that farmers and vet professionals are compensated the same as the average
+##hourly income at the national level
 seminar_length <- 3
 visits_per_year <- 3
-visit_length_individual <- 2  # GK: is this in hours? 
-transport_cost <- 4 # GK: and this is cost to the farmer in travelling? or how much the goverment pays a farmer for their time? 
+visit_length_individual <- 2  # GK: is this in hours? ##DTE yep!
+transport_cost <- 4 # GK: and this is cost to the farmer in travelling? or how much the goverment pays a farmer for their time?
+##DTE this is the the cost for the farmer (or vet professional) to travel based on average inter-city bus fees
 
 cost_per_farm_indiv <- visit_cost*visits_per_year + 
   visit_length_individual*hourly_compensation*visits_per_year +
@@ -84,6 +95,13 @@ cost_per_farm_village <- seminar_cost/farmers_per_seminar +
 # important in the sense that it can influence demographic trajectory
 ###
 # GK: Can you prove that BSI deaths don't matter that much - have a result that counts the number of deaths and shows its less than the total? give a %
+##DTE sure thing! Basically the net births in our model already includes BSI-related deaths 
+#in the base case, so what matters is the difference in deaths between the base and 
+#intervention cases. In the default scenario, this difference in deaths is on average
+#27 per year, whereas the net births each year is on average 854,000 per year,
+#meaning that by not factoring in these additional lives saved into the our demographic
+#calculations, our net biths are only off by 0.0032%
+
 
 pop <- read.csv("Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
@@ -134,9 +152,14 @@ popchange.r_low <- popchange.r_low[2:tstop] #now it shows lower rates for 2021
 ##mortality will be set to 0 because the net popchange.r already accounts for background mortality
 
 # GK: did you ever compare this to those from the World Bank? can't remember now about what you did differently to them? 
+#DTE yes I did try using the WB population projections, but they only go 20 years or so on the future
+#, meaning that in order to use them for the whole time period we would have to make a 
+#forecast of a forecast, which would generate a lot of uncertainty (i.e. we would treat the 
+#forecasted future values as real values for the purpose of prediction)
 
 ####dependency ratio
 # GK: what is this? 
+# DTE the ratio of non-working-age people to working-age people
 
 dependency <- read.csv("Population data for ARIMA/Viet Nam dependency ratio.csv")
 dependency <- ts(dependency$Dependency.Ratio, start = 1960, frequency = 1)
@@ -165,12 +188,16 @@ portion_working <- portion_working_age * emp_rate * lfpr #assuming unemployment 
 plot(portion_working)
 # GK: why does this decrease? what is the x axis? is this age? then ok makes sense... what is the error on this? as in what happened to all the variance
 # in population size shown / plotted above? 
+##DTE this decreases as the country goes through a demographic shift: the number of old people and children
+#grows relative to the working-age population as the country exits the 'demographic dividend'
+#the uncertainty disappears as we take the mean of the predicted dependency ratio to create this,
+#although we can easily create a high and a low scenario based on the high and low projections
 
 
 ###
 # Here, we define our scenarios. We set the number of periods to be 46 (the expected
 # remaining life years in our population). We let the discount rate be 0.08 and the 
-# willingness to pay for a WALY be 2365 USD, both of which are derived from theory.
+# willingness to pay for a QALY be 2365 USD, both of which are derived from theory.
 # We have possible scenarios for a) the way we estimate productivity outcomes from
 # morbidity and mortality (either the human capital approach or the friction cost 
 # approach), b) the link parameter between animal AMU and human AMR (either from Tang
@@ -178,7 +205,10 @@ plot(portion_working)
 # caused by Enterobacteriaceae spp.)
 ###
 # GK: think the above might be out of date now? 
-# GK: need a justification in the paper for the 0.08 and WALY level. 
+## DTE the paper that I took this from was from a few years ago, but I adjusted the 
+#figures for changes in income/person and inflation using the latest data
+# GK: need a justification in the paper for the 0.08 and QALY level. 
+## DTE I have not added a paragraph explaining how we got these to the modelling paper
 
 
 inputs <- read.csv("intervention 1/inputs.csv")
@@ -188,6 +218,10 @@ colnames(inputs) <- c("scenario", "parameter", "description", "value", "distribu
 
 # Logistic Growth ---------------------------------------------------------
 # GK: of what? why calculating this? 
+## DTE earlier you asked if we could have the background AMR prevalence grow logistically
+#rather than exponentially, so I tried to fit a logit model. However, the paper that we used
+#to predict changes in human AMR over time only gives two time periods of prediction, which wasn't 
+#enough to fit a logistic growth function
 logit_year <- c(1,16)
 ((0.645+0.058+0.669+0.234)/4) #0.405
 ((0.77+0.118+0.582+0.528)/4) #0.4995
@@ -209,6 +243,10 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   intervention <- inputs[scenario=="intervention"]
   
   # GK: this is the function that does...? 
+  ##DTE this function multiplies the epi matrix by the cost matrix,
+  #and the epi matrix by the reward matrix, giving us the cost and the reward associated
+  #with each individual in each state at each time period, and summing them for
+  #the total costs and rewards
   f_expvalue <- function(x,y,z){
     ## x is the epi matrix
     ## y is the cost matrix
@@ -243,6 +281,9 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   #of life and an expected remainder of life with sequelae
   
   # GK: so a person with sequelae can't get infected again? and they can't recover? they have sequalea for the rest of their life? 
+  #DTE yes, they develop sequelae for the rest of their life. They only stay in that state for one period and then go
+  #to the afterlife, and in that one period they incur the full (discounted) difference in QALYs between a life
+  #with sequelae and a life in perfect health. I have added a paragraph in the modelling paper explaining this
   
   state_names <- c("well", "res","sus","dead", "afterlife", "seq") ## the compartments
   transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s", "dead_aft", "sick_seq")  ## the transition probabilities
@@ -257,6 +298,8 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   rownames(m_param) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
   # GK: what is this? Oh.. ok .. All is twice as big as enterobacteria BSIs? why? justification needed in paper
+  ##DTE yes, twice as much - this is drawn from the old parameter spreadsheet that I inherited so I 
+  #will find the source and include it in the paper
   if(scenario_outcomes == "All"){
     tuning <- 2
   }else if (scenario_outcomes == "Enterobacteria"){
@@ -265,16 +308,45 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   
   # Populating the m_param matrix 
   # GK: can you add a description of what each of these are? either here or above in the transition names label? or make them the same as in Figure 1
-  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t) # GK: 40%? this seems high? unless sequalae are not very costly? 
+  ##DTE I have now added some labels
+  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t) 
+  #chance of developing sequelae following infection
+  # GK: 40%? this seems high? unless sequalae are not very costly?
+  ## DTE the 40% figure does seem really high - it was drawn from Cassini et al.
+  # The sequelae are somewhat costly (QoL = 0.9355)
+  
   m_param[ , "r"] <- rep(tuning*human[parameter=="well_r",value], n.t)
+  #chance of developing a resistant infection in a year
+  
   m_param[ , "s"] <- rep(tuning*human[parameter=="well_s",value], n.t)
+  #chance of developing a susceptible infection in a year
+  
   m_param[ , "mort_r"] <- rep(human[parameter=="r_dead",value], n.t)
+  #fatality from resistant infection
+  
   m_param[ , "mort_s"] <- rep(human[parameter=="s_dead",value], n.t)
+  #fatality from susceptible infection
+  
   m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]+m_param[1,"sick_seq"]), n.t)
+  #chance of recovering from a resistant infection
+  
   m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]+m_param[1,"sick_seq"]), n.t)
-  m_param[ , "birth"] <- popchange[1:n.t] ##set to be predicted net births
-  m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births # GK: but this parameter is in Figure 1? 
-  m_param[ , "dead_aft"] <- rep(1, n.t) #all those who die go to the afterlife
+  #chance of recovering from a susceptible infection
+  
+  m_param[ , "birth"] <- popchange[1:n.t]
+  #predicted net births in a given year
+  
+  m_param[ , "mort_w"] <- rep(0, n.t) 
+  #chance of dying without infection from 'well'
+  ##set to zero because background mortality is included in net births # GK: but this parameter is in Figure 1? 
+  #DTE yes we have a chance of dying from 'well' in figure 1 - in theory, we still model the 
+  #chance of dying without infection, but we capture this with net births instead. Otherwise, we would have to
+  #model the total mortality in Viet Nam, and the total births, which are already captured in the data on 
+  #net births
+  
+  
+  m_param[ , "dead_aft"] <- rep(1, n.t) 
+  #all those who die go to the afterlife
   
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
   
@@ -300,7 +372,9 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   #of infections with susceptible and resistant bacteria sum to the total number of
   #infections. Thus, the highest resistance outcome is one in which all infections are
   #resistant but the total number of infections remains the same
-  disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here # GK: don't think you use this? could replace in the below calcs? 
+  disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here 
+  # GK: don't think you use this? could replace in the below calcs?
+  #DTE you're right, I think I ended up not using this one - I have commented it out in the original code
   
   for(i in 1:n.t){
     if(m_param[i, "r"] > 0.9*(m_param[1,"r"]+m_param[1,"s"])){ ##DTE changed maximum portion resistant to 90%
@@ -322,20 +396,26 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
         (m_param[i-1,"mort_r"]*m_param[i-1,"res"]) - (m_param[i-1,"rec_r"]*m_param[i-1,"res"]) -
         (m_param[i-1, "sick_seq"]*m_param[i-1,"res"]) ## added this so that the number of people in 'res' subtracts the people who went into 'seq'
       # GK: Are you then assuming that there is the same proportion of BSIs that progress to sequalae for R and S infections? might think R might have more? 
+      ##DTE the Cassini paper didn't differentiate, but it is makes sense to have a higher chance from res - we can add this assumption
       m_param[i,"sus"] <- m_param[i-1,"sus"] + (m_param[i-1,"s"]*m_param[i-1,"well"]) -
         (m_param[i-1,"mort_s"]*m_param[i-1,"sus"]) - (m_param[i-1,"rec_s"]*m_param[i-1,"sus"]) -
         (m_param[i-1, "sick_seq"]*m_param[i-1,"sus"]) ## added this so that the number of people in 'sus' subtracts the people who went into 'seq'
       # GK: I'm not sure the last term is correct - this removes people to sequalae for 1 time step and then they disappear? I think you can remove it and keep the counting
       # going on in "seq" below as a tracking / counting incidence term. Same for m_param[i,"res"] above? 
+      ## DTE yes it seems a bit weird - initially it was set up as you have described above. However, I changed it so that people only stay in seq (or dead) for one
+      #period for the reasons that I described earlier, and I have elaborated in the paper
       m_param[i,"dead"] <- (m_param[i-1,"mort_r"]*m_param[i-1,"res"]) + (m_param[i-1,"mort_s"]*m_param[i-1,"sus"])+
-        (m_param[i-1,"mort_w"]*m_param[i-1,"well"])
+      #  (m_param[i-1,"mort_w"]*m_param[i-1,"well"])
       # GK: remove third term as zero? 
+      #DTE have commented out
       # GK: so this is an incidence term? as it doesn't include m_param[i-1,"dead"]? just checking how you use it later
+      #DTE yup!
       
       m_param[i, "afterlife"] <- m_param[i-1, "afterlife"] + m_param[i-1, "dead"] + m_param[i-1, "seq"] #just keeps growing
       
       m_param[i, "seq"] <- m_param[i-1, "sick_seq"]*(m_param[i-1, "res"]+m_param[i-1, "sus"]) #only spend one period in 'seq' then go straight to the shadow realm
-      # GK: in Figure 1 they go into Dead? 
+      # GK: in Figure 1 they go into Dead?
+      # DTE: I have updated figure 1 now
     }
     return(m_param)
   }
@@ -396,6 +476,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   #therefore the scenario with more deaths, infections and sequelae will have a negative
   #'reward' of larger absolute value
   # GK: I think all these parameter calculations should go into a separate R file for parameter calcs - split by human / animal / economic / intervention or something
+  #DTE sounds good!
   r_s <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_ill",value]-1) ## QoL lost from time in hospital
   r_r <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_res",value]-1) ## same but adjusted for longer LoS
   r_d <- -1 * pv_life #discounted QoL loss from death
@@ -569,6 +650,9 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
       (m_param_c_temp[i-1,"mort_r"]*m_param_c_temp[i-1,"res"]) + 
       (m_param_c_temp[i-1,"mort_s"]*m_param_c_temp[i-1,"sus"])
     # GK: Again this is just an incidence - just checking how you use later (as in no i-1,"fallen" counted at start)
+    # Yes this is just an incidence! Also for the animals, the production cycle is less than 1 year, and the new animals are
+    #assumed to be bought as hathlings/piglets, so the population in one period does not depend on the population in the
+    #previous period
     m_param_c_temp[i, "well"] <- m_param_c_temp[i-1,"well"] - (m_param_c_temp[i-1,"well"]*m_param_c_temp[i-1,"mort_w"]) +
       (m_param_c_temp[i-1,"rec_r"]*m_param_c_temp[i-1,"res"])+ 
       (m_param_c_temp[i-1,"rec_s"]*m_param_c_temp[i-1,"sus"])
@@ -578,10 +662,13 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
     
     ## final states
     m_c_sum <- m_param_c_temp[4,]
-    m_c_sum[2] <- m_param_c_temp[2,2] # GK: why are you using a number to index now? can't you use "res" etc? might introduce mistakes and I can't follow it 
+    m_c_sum[2] <- m_param_c_temp[2,2] 
+    # GK: why are you using a number to index now? can't you use "res" etc? might introduce mistakes and I can't follow it 
+    ##DTE I have now changed it in the main R script
     m_c_sum[3] <- m_param_c_temp[2,3]
     m_c_sum[1] <- chicken[parameter=="n_animals", value] - m_c_sum[2] - m_c_sum[3] ## reset the number in 'well'
     # GK: so not counting number dead / fallen?
+    # DTE correct!
     m_c_sum[1:5] <- chicken[parameter=="annual_cycles",value] * m_c_sum[1:5] #multiply by the number of annual cycles
     
     m_param_c <- matrix(rep(m_c_sum), nrow=n.t, ncol =length(parameter_names_c))
@@ -598,6 +685,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   ### ignore totals of transition probs etc. as they are over counted etc.
   ## just want to focus on health state totals
   # GK: Same values every year? what about the change in resistance levels in the chickens? 
+  ##DTE we can definitely incorporate this, but may have to rewrite the animal epi functions a bit
   
   # Pig Epi Model -----------------------------------------------------------
   
@@ -790,6 +878,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   
   #make sure that the total number of infections remains constant
   # GK: didn't you do this above? 
+  ##DTE Yes we did! I will comment out this bit and see if it makes any difference
   for(i in 1:n.t){
     if(m_param2[i, "r"] > 0.9*(m_param2[1,"r"]+m_param2[1,"s"])){ ##DTE changed maximum portion resistant to 90%
       m_param2[i, "r"] <- 0.9*(m_param2[1,"r"]+m_param2[1,"s"]) ##DTE changed maximum portion resistant to 90%
