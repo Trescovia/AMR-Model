@@ -17,18 +17,21 @@ library("pksensi")
 library("sensitivity")
 library("xlsx")
 library("gridExtra")
+library("here") # GK: then don't need to point at route for files: sets WD to 
+
+setwd(here::here()) # GK: setwd to where this Rproject is on your computer
 
 # Global parameters and scenarios -----------------------------------------
 
 n.t <- 47 ## time horizon - 46 years + cycle 0 (initial states)
 tstop <- n.t + 3
-dr <- 0.08 ## discount rate
-wtp <- 2365 ## willingness to pay per QALY gained
-emp_rate <- 0.98162 
-lfpr <- 0.767
-hosp_time_res <- 1-0.923504449
-hosp_time_sus <- 1-0.94
-remaining_working_years <- 34
+dr <- 0.08 ## discount rate ## GK: do you ever vary this? how come fixed? 
+wtp <- 2365 ## willingness to pay per QALY gained ## GK: is this fixed? is this for Viet Nam? we may have to vary for the framework scenario analysis? 
+emp_rate <- 0.98162  # GK: what is this? 
+lfpr <- 0.767 # GK: what is this? 
+hosp_time_res <- 1-0.923504449  # GK: what is this? seems spuriously precise
+hosp_time_sus <- 1-0.94  # GK: seems v similar to above? 
+remaining_working_years <- 34  # GK: what does this assume? certain life expec and average age of infection? is that realistic? 
 
 #Scenarios
 scenario <- "HCA" #must be "HCA" or "FCA"
@@ -44,15 +47,15 @@ scenario_amr_grow <- "med" #must be "lo", "med", "hi" or "max" ##DTE added AMR g
 seminar_cost <- 25
 visit_cost <- 25
 farmers_per_seminar <- 10
-hourly_compensation <- 4.3
+hourly_compensation <- 4.3 # GK: bit confused on the perspectives here: is this how much productivity they lose per hour? compensation seems an odd name for it 
 seminar_length <- 3
 visits_per_year <- 3
-visit_length_individual <- 2
-transport_cost <- 4
+visit_length_individual <- 2  # GK: is this in hours? 
+transport_cost <- 4 # GK: and this is cost to the farmer in travelling? or how much the goverment pays a farmer for their time? 
 
 cost_per_farm_indiv <- visit_cost*visits_per_year + 
   visit_length_individual*hourly_compensation*visits_per_year +
-  seminar_cost/farmers_per_seminar +
+  seminar_cost/farmers_per_seminar + # assumes one farmer per farm? 
   seminar_length*hourly_compensation +
   transport_cost
 
@@ -80,8 +83,9 @@ cost_per_farm_village <- seminar_cost/farmers_per_seminar +
 # This therefore relies on the assumption that the amount of deaths from BSIs is not systemically
 # important in the sense that it can influence demographic trajectory
 ###
+# GK: Can you prove that BSI deaths don't matter that much - have a result that counts the number of deaths and shows its less than the total? give a %
 
-pop <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Vietnam Population.csv")
+pop <- read.csv("Population data for ARIMA/Vietnam Population.csv")
 pop <- ts(pop$Population, start = 1960, frequency = 1)#
 ARIMApop <- auto.arima(pop, stepwise = F, approximation = F)
 plot(forecast(ARIMApop, tstop))
@@ -129,9 +133,12 @@ popchange.r_low <- popchange.r_low[2:tstop] #now it shows lower rates for 2021
 ##here I have predicted net popchange and will use this as the 'birth' parameter. This means that the background 
 ##mortality will be set to 0 because the net popchange.r already accounts for background mortality
 
-####dependency ratio
+# GK: did you ever compare this to those from the World Bank? can't remember now about what you did differently to them? 
 
-dependency <- read.csv("C:/Users/tresc/Desktop/AMR-Model/Population data for ARIMA/Viet Nam dependency ratio.csv")
+####dependency ratio
+# GK: what is this? 
+
+dependency <- read.csv("Population data for ARIMA/Viet Nam dependency ratio.csv")
 dependency <- ts(dependency$Dependency.Ratio, start = 1960, frequency = 1)
 arimadependency <- auto.arima(dependency, stepwise = F, approximation = F)
 plot(forecast(arimadependency, tstop))
@@ -156,6 +163,8 @@ plot(portion_working_age)
 portion_working <- portion_working_age * emp_rate * lfpr #assuming unemployment rate equal to mean of 2016-2020 and LFPR equal to mean of 2016-2019
 
 plot(portion_working)
+# GK: why does this decrease? what is the x axis? is this age? then ok makes sense... what is the error on this? as in what happened to all the variance
+# in population size shown / plotted above? 
 
 
 ###
@@ -168,14 +177,17 @@ plot(portion_working)
 # or from Booton), and c) the infection types looked at (either all BSIs or all BSIs
 # caused by Enterobacteriaceae spp.)
 ###
+# GK: think the above might be out of date now? 
+# GK: need a justification in the paper for the 0.08 and WALY level. 
 
-inputs <- read.csv("C:/Users/tresc/Desktop/AMR-Model/intervention 1/inputs.csv")
+
+inputs <- read.csv("intervention 1/inputs.csv")
 inputs <- as.data.table(inputs)
 colnames(inputs) <- c("scenario", "parameter", "description", "value", "distribution", "low", "high", "notes")
 
 
 # Logistic Growth ---------------------------------------------------------
-
+# GK: of what? why calculating this? 
 logit_year <- c(1,16)
 ((0.645+0.058+0.669+0.234)/4) #0.405
 ((0.77+0.118+0.582+0.528)/4) #0.4995
@@ -196,7 +208,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   pig <- inputs[scenario=="pig"]
   intervention <- inputs[scenario=="intervention"]
   
-  
+  # GK: this is the function that does...? 
   f_expvalue <- function(x,y,z){
     ## x is the epi matrix
     ## y is the cost matrix
@@ -208,7 +220,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   
   f_di <- function(x,y){
     # function to apply a discount rate
-    # x is cost
+    # x is cost # as a vector? 
     # y is discount rate 
     x2 <- x - (x*y)
     return(x2)
@@ -230,6 +242,8 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   #difference in discounted future welfare between a pefectly healthy expected remainder
   #of life and an expected remainder of life with sequelae
   
+  # GK: so a person with sequelae can't get infected again? and they can't recover? they have sequalea for the rest of their life? 
+  
   state_names <- c("well", "res","sus","dead", "afterlife", "seq") ## the compartments
   transition_names  <- c("birth","r","s","mort_r", "mort_s","mort_w", "rec_r","rec_s", "dead_aft", "sick_seq")  ## the transition probabilities
   parameter_names <- c(state_names, transition_names)
@@ -242,13 +256,16 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   colnames(m_param) <- parameter_names
   rownames(m_param) <- paste("cycle", 0:(n.t-1), sep  =  "")
   
+  # GK: what is this? Oh.. ok .. All is twice as big as enterobacteria BSIs? why? justification needed in paper
   if(scenario_outcomes == "All"){
     tuning <- 2
   }else if (scenario_outcomes == "Enterobacteria"){
     tuning <- 1
   }
   
-  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t)
+  # Populating the m_param matrix 
+  # GK: can you add a description of what each of these are? either here or above in the transition names label? or make them the same as in Figure 1
+  m_param[ , "sick_seq"] <- rep(human[parameter=="sick_seq", value], n.t) # GK: 40%? this seems high? unless sequalae are not very costly? 
   m_param[ , "r"] <- rep(tuning*human[parameter=="well_r",value], n.t)
   m_param[ , "s"] <- rep(tuning*human[parameter=="well_s",value], n.t)
   m_param[ , "mort_r"] <- rep(human[parameter=="r_dead",value], n.t)
@@ -256,7 +273,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   m_param[ , "rec_r"] <- rep(1-(m_param[1,"mort_r"]+m_param[1,"sick_seq"]), n.t)
   m_param[ , "rec_s"] <- rep(1-(m_param[1,"mort_s"]+m_param[1,"sick_seq"]), n.t)
   m_param[ , "birth"] <- popchange[1:n.t] ##set to be predicted net births
-  m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births
+  m_param[ , "mort_w"] <- rep(0, n.t) ##set to zero because background mortality is included in net births # GK: but this parameter is in Figure 1? 
   m_param[ , "dead_aft"] <- rep(1, n.t) #all those who die go to the afterlife
   
   m_param[1, 1:length(state_names)] <- state_i ## adding initial cycle 0 values
@@ -283,7 +300,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   #of infections with susceptible and resistant bacteria sum to the total number of
   #infections. Thus, the highest resistance outcome is one in which all infections are
   #resistant but the total number of infections remains the same
-  disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here
+  disease_max <- m_param[1,"r"]+m_param[1,"s"] ## added 'tuning*' here # GK: don't think you use this? could replace in the below calcs? 
   
   for(i in 1:n.t){
     if(m_param[i, "r"] > 0.9*(m_param[1,"r"]+m_param[1,"s"])){ ##DTE changed maximum portion resistant to 90%
@@ -297,24 +314,28 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
     for (i in 2:(n.t)){
       
       m_param[i,"well"] <- m_param[i-1,"well"] -(m_param[i-1,"r"]*m_param[i-1,"well"]) -
-        (m_param[i-1,"s"]*m_param[i-1,"well"]) + m_param[i-1,"birth"] - ## changed so that we just add the births, not bloody multiple the population by them
+        (m_param[i-1,"s"]*m_param[i-1,"well"]) + m_param[i-1,"birth"] - ## changed so that we just add the births, not bloody multiple the population by them # GK: !! 
         (m_param[i-1,"mort_w"]*m_param[i-1,"well"])+(m_param[i-1,"rec_r"]*m_param[i-1,"res"])+
         (m_param[i-1,"rec_s"]*m_param[i-1,"sus"])
       
       m_param[i,"res"] <- m_param[i-1,"res"] + (m_param[i-1,"r"]*m_param[i-1,"well"]) - 
         (m_param[i-1,"mort_r"]*m_param[i-1,"res"]) - (m_param[i-1,"rec_r"]*m_param[i-1,"res"]) -
         (m_param[i-1, "sick_seq"]*m_param[i-1,"res"]) ## added this so that the number of people in 'res' subtracts the people who went into 'seq'
-      
+      # GK: Are you then assuming that there is the same proportion of BSIs that progress to sequalae for R and S infections? might think R might have more? 
       m_param[i,"sus"] <- m_param[i-1,"sus"] + (m_param[i-1,"s"]*m_param[i-1,"well"]) -
         (m_param[i-1,"mort_s"]*m_param[i-1,"sus"]) - (m_param[i-1,"rec_s"]*m_param[i-1,"sus"]) -
         (m_param[i-1, "sick_seq"]*m_param[i-1,"sus"]) ## added this so that the number of people in 'sus' subtracts the people who went into 'seq'
-      
+      # GK: I'm not sure the last term is correct - this removes people to sequalae for 1 time step and then they disappear? I think you can remove it and keep the counting
+      # going on in "seq" below as a tracking / counting incidence term. Same for m_param[i,"res"] above? 
       m_param[i,"dead"] <- (m_param[i-1,"mort_r"]*m_param[i-1,"res"]) + (m_param[i-1,"mort_s"]*m_param[i-1,"sus"])+
         (m_param[i-1,"mort_w"]*m_param[i-1,"well"])
+      # GK: remove third term as zero? 
+      # GK: so this is an incidence term? as it doesn't include m_param[i-1,"dead"]? just checking how you use it later
       
       m_param[i, "afterlife"] <- m_param[i-1, "afterlife"] + m_param[i-1, "dead"] + m_param[i-1, "seq"] #just keeps growing
       
       m_param[i, "seq"] <- m_param[i-1, "sick_seq"]*(m_param[i-1, "res"]+m_param[i-1, "sus"]) #only spend one period in 'seq' then go straight to the shadow realm
+      # GK: in Figure 1 they go into Dead? 
     }
     return(m_param)
   }
@@ -374,7 +395,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   #years, and the 'reward' for being infected is the loss of welfare while hospitalised
   #therefore the scenario with more deaths, infections and sequelae will have a negative
   #'reward' of larger absolute value
-  
+  # GK: I think all these parameter calculations should go into a separate R file for parameter calcs - split by human / animal / economic / intervention or something
   r_s <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_ill",value]-1) ## QoL lost from time in hospital
   r_r <- human[parameter=="background_qol",value]*(human[parameter=="hrqol_res",value]-1) ## same but adjusted for longer LoS
   r_d <- -1 * pv_life #discounted QoL loss from death
@@ -547,19 +568,20 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
     m_param_c_temp[i,"fallen"] <- (m_param_c_temp[i-1,"mort_w"]*m_param_c_temp[i-1,"well"]) +
       (m_param_c_temp[i-1,"mort_r"]*m_param_c_temp[i-1,"res"]) + 
       (m_param_c_temp[i-1,"mort_s"]*m_param_c_temp[i-1,"sus"])
+    # GK: Again this is just an incidence - just checking how you use later (as in no i-1,"fallen" counted at start)
     m_param_c_temp[i, "well"] <- m_param_c_temp[i-1,"well"] - (m_param_c_temp[i-1,"well"]*m_param_c_temp[i-1,"mort_w"]) +
       (m_param_c_temp[i-1,"rec_r"]*m_param_c_temp[i-1,"res"])+ 
       (m_param_c_temp[i-1,"rec_s"]*m_param_c_temp[i-1,"sus"])
     
     i <- 4 ##sold
-    m_param_c_temp[i,"sold"] <- (m_param_c_temp[i-1,"w_sold"]*m_param_c_temp[i-1,"well"])
+    m_param_c_temp[i,"sold"] <- (m_param_c_temp[i-1,"w_sold"]*m_param_c_temp[i-1,"well"]) # should this be removed from the "well" chickens? presumably they are effectively dead?
     
     ## final states
     m_c_sum <- m_param_c_temp[4,]
-    m_c_sum[2] <- m_param_c_temp[2,2]
+    m_c_sum[2] <- m_param_c_temp[2,2] # GK: why are you using a number to index now? can't you use "res" etc? might introduce mistakes and I can't follow it 
     m_c_sum[3] <- m_param_c_temp[2,3]
     m_c_sum[1] <- chicken[parameter=="n_animals", value] - m_c_sum[2] - m_c_sum[3] ## reset the number in 'well'
-    
+    # GK: so not counting number dead / fallen?
     m_c_sum[1:5] <- chicken[parameter=="annual_cycles",value] * m_c_sum[1:5] #multiply by the number of annual cycles
     
     m_param_c <- matrix(rep(m_c_sum), nrow=n.t, ncol =length(parameter_names_c))
@@ -575,7 +597,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   m_param_c <- f_chicken_epi(m_param_c_base,n.t) ## named for chicken
   ### ignore totals of transition probs etc. as they are over counted etc.
   ## just want to focus on health state totals
-  
+  # GK: Same values every year? what about the change in resistance levels in the chickens? 
   
   # Pig Epi Model -----------------------------------------------------------
   
@@ -767,6 +789,7 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   }
   
   #make sure that the total number of infections remains constant
+  # GK: didn't you do this above? 
   for(i in 1:n.t){
     if(m_param2[i, "r"] > 0.9*(m_param2[1,"r"]+m_param2[1,"s"])){ ##DTE changed maximum portion resistant to 90%
       m_param2[i, "r"] <- 0.9*(m_param2[1,"r"]+m_param2[1,"s"]) ##DTE changed maximum portion resistant to 90%
@@ -1043,7 +1066,7 @@ scenario_analysis_amrgrowth[3,1:4] <- as.numeric(model(inputs)[1,1:4])
 scenario_amr_grow <- "max"
 scenario_analysis_amrgrowth[4,1:4] <- as.numeric(model(inputs)[1,1:4]) 
 
-write.xlsx(scenario_analysis_amrgrowth, "C:/Users/tresc/Desktop/AMR-Model/Intervention 1/Scenario Analysis AMR Growth.xlsx")
+write.xlsx(scenario_analysis_amrgrowth, "Intervention 1/Scenario Analysis AMR Growth.xlsx")
 
 
 ##Transmission to Humans, Productivity Method, Bacteria Concerned
