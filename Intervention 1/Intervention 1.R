@@ -20,6 +20,8 @@ library("gridExtra")
 library("ggplot2")
 library("reshape2")
 library("here")
+library("devtools")
+library("multisensi")
 
 # Global parameters and scenarios -----------------------------------------
 
