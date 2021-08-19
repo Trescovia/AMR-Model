@@ -1,4 +1,4 @@
-cd "C:\Users\tresc\Desktop\AMR-Model\General model"
+cd "C:\Users\tresc\Desktop\AMR-Model\General model\input data"
 
 import delimited using "global-meat-production.csv"
 
@@ -194,6 +194,84 @@ egen mean_productivity = mean(productivity), by(income_status)
 
 //7.84USD for lower-MICs (standin for LICs)
 
+drop if country == "British Virgin Islands" | country == "China, Hong Kong SAR" | country == "China, Macao SAR" | country == "Curaçao" | country == "Montserrat" | country == "Sint Maarten (Dutch part)" | country == "Turks and Caicos Islands"
+
+replace country = "South Korea" if country == "Republic of Korea"
+replace country = "Russia" if country == "Russian Federation"
+replace country = "Viet Nam" if country == "Vietnam"
+
+save prod.dta, replace
+
+use pwt.dta, clear
+
+keep year pop emp avh country
+
+egen max_year = max(year), by(country)
+
+drop if year != max_year
+
+drop year max_year
+
+gen lfpr = emp/pop
+
+label var lfpr "labour force participation rate"
+
+label var country "Country"
+
+drop if country == "British Virgin Islands" | country == "China, Hong Kong SAR" | country == "China, Macao SAR" | country == "Curaçao" | country == "Montserrat" | country == "Sint Maarten (Dutch part)" | country == "Turks and Caicos Islands"
+
+replace country = "South Korea" if country == "Republic of Korea"
+replace country = "Russia" if country == "Russian Federation"
+replace country = "Viet Nam" if country == "Vietnam"
+
+merge 1:1 country using "prod.dta"
+
+gen annual_productivity = avh*productivity 
+
+replace income_status = "M"
+
+replace income_status = "H" if country == "Australia" | country == "Austria" | country == "Barbados" | country == "Belgium" | country == "Canada" | country == "Chile" | country == "Croatia" | country == "Cyprus" | country == "Czechia" | country == "Denmark" | country == "Estonia" | country == "Finland" | country == "France" | country == "Germany" | country == "Greece" | country == "Hungary" | country == "Iceland" | country == "Ireland" | country == "Israel" | country == "Italy" | country == "Japan " | country == "South Korea" | country == "Latvia" | country == "Lithuania" | country == "Luxembourg" | country == "Malta" | country == "Netherlands" | country == "New Zealand" | country == "Norway" | country == "Poland" | country == "Portugal" | country == "Singapore" | country == "Slovakia" | country == "Slovenia" | country == "Spain" | country == "Sweden" | country == "Switzerland" | country == "Taiwan" | country == "Trinidad and Tobago" | country == "United Kingdom" | country == "United States" | country == "Uruguay"
+
+/*
+Antigua and Barbuda Bahamas Bahrain Barbados Brunei Darussalam Kuwait Luxembourg Oman Qatar Saudi Arabia Seychelles Singapore United Arab Emirates
+*/
+
+replace income_status = "L" if country == "Bangladesh" | country == "Cambodia" | country == "India" | country == "Indonesia" | country == "Myanmar" | country == "Pakistan" | country == "Philippines" | country == "Sri Lanka" | country == "Viet Nam"
+
+/*
+Burundi Central African Republic Chad D.R. of the Congo Ethiopia Gambia Guinea Guinea-Bissau Liberia Madagascar Malawi Mali Mozambique Niger Rwanda Sierra Leone Sudan Syrian Arab Republic Togo Uganda Yemen
+*/
+
+/*
+Angola Algeria Bangladesh Belize Benin Bolivia (Plurinational State of) Cabo Verde Cambodia Cameroon Comoros Congo Côte d'Ivoire Djibouti Egypt El Salvador Eswatini Ghana Haiti Honduras India Indonesia Iran (Islamic Republic of) Kenya Kyrgyzstan Lao People's DR Lesotho Mauritania Mongolia Morocco Myanmar Nepal Nicaragua Nigeria Pakistan Philippines Sao Tome and Principe Senegal Sri Lanka U.R. of Tanzania: Mainland Tajikistan Tunisia Ukraine Uzbekistan Viet Nam State of Palestine Zambia Zimbabwe
+*/
+
+egen mean_annual_productivity = mean(annual_productivity), by(income_status)
+
+egen mean_lfpr = mean(lfpr), by(income_status)
+
+/*
+annual productivity (worked hours times hourly productivity)
+l-MIC: 16365.19
+u-MIC: 39920
+HIC: 79893
+
+LFPR
+l-MIC: .4199239
+u-MIC: .4055108
+HIC: .4939464
+*/
+
+display 0.5*(16365.19+39920)
+
+save prod.dta, replace 
+
+
+
+
+
+
+
 import delimited using "pig weight.csv", clear
 
 drop item element unit
@@ -256,3 +334,67 @@ LICs: 1.200792
 MICs: 1.335566
 HICs: 1.599206
 */
+
+import delimited using "sepsis incidence.csv", clear
+
+ren ïcountry country 
+label var country "country"
+
+ren sepsisasirper100000population sepsis_incidence 
+ren sepsisasmrper100000population sepsis_mortality
+
+ren mortalityrate fatality_rate
+
+destring sepsis_incidence, replace ignore(",")
+destring sepsis_mortality, replace ignore(",")
+
+replace fatality_rate = sepsis_mortality / sepsis_incidence
+
+replace income_status = "X" if country == "High-income"
+
+egen mean_incidence = mean(sepsis_incidence), by(income_status)
+egen mean_mortality = mean(sepsis_mortality), by(income_status)
+egen mean_fatality_rate = mean(fatality_rate), by(income_status)
+
+import delimited using "resistomap DRI.csv", clear
+
+ren ïcountry country
+
+label var country "Country" 
+
+label var dri "Resistomap Drug-Resistance Index"
+
+label var gdppcppp "GDP per Capita, PPP"
+
+egen mean_dri = mean(dri), by(income_status)
+
+/*
+HIC: 35.44828
+uMIC: 54.2
+lMIC: 65
+mean of lMIC and uMIC is 59.6
+*/ 
+
+twoway scatter dri gdppcppp
+
+gen above_45 = 1 if gdppcppp >= 45000
+replace above_45 = 0 if gdppcppp < 45000
+
+reg dri gdppcppp
+reg dri gdppcppp above_45
+reg dri gdppcppp if above_45 == 0
+reg dri gdppcppp if above_45 == 1 & country != "Ireland" //excluded due to outlier level of income per person
+reg dri gdppcppp if country != "Ireland"
+
+/*
+generally, AMR seems to have a negative relationship with income/person up until 45,000 USD per person, after which point it seems to have no significant relationship 
+
+extrapolating back to GDPPCPPP of 2524 (average of LICs) using the regression for under-45k, we would get
+65.25824 + 2524 * (-.000579) = 63.796844
+
+extrapolating to GDPPCPPP of 11816, we woud get
+65.25824 + 11816 * (-.000579) = 58.416776
+
+again, average of HICs is 35.44828
+extrpolating to average of HICs (GDPPCPPP of 50,752) using the whole-sample regression without Ireland gives 
+69.09229 + 50752*(-.0007564) = 30.703477 but we have seen that the relationship is not significant over 45k
