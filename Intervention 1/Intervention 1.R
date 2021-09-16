@@ -404,6 +404,8 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   r_d <- -1 * pv_life #discounted QoL loss from death
   r_seq <- pv_life_seq - pv_life # fixed this because we were previously assigning a benefit to sequelae (the subtraction was the wrong way around lol)
   
+  ##the above 4 lines may need fixing!!!!!!
+  
   rwd_i <- c(0,r_r,r_s,r_d,0,r_seq) 
   
   
@@ -533,7 +535,8 @@ logitselfstart <- nls(logit_prevalence ~ SSlogis(logit_year)) ##not enough data 
   
   #here, we have a set mortality rate for all states - 
   #it only matters if animals are in 'res' or 'sus' for the purpose of calculating 
-  #the cost of therapeutic treatment (set to zero for now) ## updated this annotation as we now assume no resources spent to treat sick chickens
+  #the cost of therapeutic treatment (set to zero for now) 
+  ## updated this annotation as we now assume no resources spent to treat sick chickens
   #we are able to do this because the trial data only tells us the effect on overall mortality,
   #which inherently takes into account the portion which develop res and sus infections
   m_param_c_base[ , "r"] <- rep(chicken[parameter=="well_r",value], n.t)

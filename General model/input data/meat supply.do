@@ -398,3 +398,27 @@ extrapolating to GDPPCPPP of 11816, we woud get
 again, average of HICs is 35.44828
 extrpolating to average of HICs (GDPPCPPP of 50,752) using the whole-sample regression without Ireland gives 
 69.09229 + 50752*(-.0007564) = 30.703477 but we have seen that the relationship is not significant over 45k
+
+*/
+
+import delimited "hospital bed day.csv", clear
+
+ren ïcountry country 
+label var country "Country"
+
+ren incomecapitappp GDPPCPPP 
+ren hospitalbeddaycostnominalusd bed_day_cost
+
+destring GDPPCPPP, replace ignore(",")
+
+twoway scatter bed_day_cost GDPPCPPP
+
+reg bed_day_cost GDPPCPPP
+
+reg bed_day_cost GDPPCPPP, nocons
+
+/*
+for the average GDPPCPPP of LIC, MIC, HIC:
+LIC: .0076175*2524 = 
+MIC: .0076175*11816 = 
+HIC: .0076175*50572 = 
